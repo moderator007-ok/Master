@@ -1,7 +1,3 @@
-# Don't Remove Credit Tg - @VJ_Botz
-# Subscribe YouTube Channel For Amazing Bot https://youtube.com/@Tech_VJ
-# Ask Doubt on telegram @KingVJ01
-
 import os
 import time
 import datetime
@@ -158,7 +154,11 @@ async def download_video(url,cmd, name):
     global failed_counter
     print(download_cmd)
     logging.info(download_cmd)
-    k = subprocess.run(download_cmd, shell=True)
+    try:
+        k = subprocess.run(download_cmd, shell=True, timeout=120)  # Increase timeout if necessary
+    except subprocess.TimeoutExpired:
+        logging.error(f"Timeout expired for command: {download_cmd}")
+        return None
     if "visionias" in cmd and k.returncode != 0 and failed_counter <= 10:
         failed_counter += 1
         await asyncio.sleep(5)
@@ -221,4 +221,3 @@ async def send_vid(bot: Client, m: Message,cc,filename,thumb,name,prog):
 
     os.remove(f"{filename}.jpg")
     await reply.delete (True)
-    
