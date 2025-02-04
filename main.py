@@ -134,9 +134,12 @@ async def upload(bot: Client, m: Message):
             elif 'videos.classplusapp' in url:
                 url = requests.get(f'https://api.classplusapp.com/cams/uploader/video/jw-signed-url?url={url}', headers={'x-access-token': 'your-access-token'}).json()['url']
 
-            elif '/master.mpd' in url:
-                id = url.split("/")[-2]
-                url = "https://d26g5bnklkwsh4.cloudfront.net/" + id + "/master.m3u8"
+            elif '/master.mpd' in url or '/masterpl.mpd' in url:
+            id = url.split("/")[-2]
+            if '/master.mpd' in url:
+            url = "https://d26g5bnklkwsh4.cloudfront.net/" + id + "/master.m3u8"
+           else:
+            url = "https://d26g5bnklkwsh4.cloudfront.net/" + id + "/masterpl.m3u8"
 
             name1 = links[i][0].replace("\t", "").replace(":", "").replace("/", "").replace("+", "").replace("#", "").replace("|", "").replace("@", "").replace("*", "").replace(".", "").replace("https", "")
             name = f'{str(count).zfill(3)}) {name1[:60]}'
