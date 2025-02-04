@@ -152,8 +152,8 @@ async def upload(bot: Client, m: Message):
                 cmd = f'yt-dlp -f "{ytf}" "{url}" -o "{name}.mp4"'
 
             try:
-                cc = f'**[📽️] Vid_ID:** {str(count).zfill(3)}.** {𝗻𝗮𝗺𝗲𝟭}{MR}.mkv\n**𝔹ᴀᴛᴄʜ** » **{raw_text0}**'
-                cc1 = f'**[📁] Pdf_ID:** {str(count).zfill(3)}. {𝗻𝗮𝗺𝗲𝟭}{MR}.pdf \n**𝔹ᴀᴛᴄʜ** » **{raw_text0}**'
+                cc = f'{str(count).zfill(3)}.** 𝗻𝗮𝗺𝗲𝟭.mkv\nBatch Name : **{raw_text0}'
+                cc1 = f'{str(count).zfill(3)}. 𝗻𝗮𝗺𝗲𝟭.pdf \nBatch Name : {raw_text0}'
                 if "drive" in url:
                     try:
                         ka = await helper.download(url, name)
@@ -196,7 +196,7 @@ async def upload(bot: Client, m: Message):
 
     except Exception as e:
         await m.reply_text(str(e))
-    await m.reply_text("**𝔻ᴏɴᴇ 𝔹ᴏ𝕤𝕤😎**")
+    await m.reply_text("**Magic Brewed😎**")
 
 
 bot.run()
