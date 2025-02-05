@@ -183,8 +183,7 @@ async def upload(bot: Client, m: Message):
                 elif ".pdf" in url:
                     try:
                         cmd = f'yt-dlp -o "{name}.pdf" "{url}"'
-                        download_cmd = f"{cmd} -R 10 --fragment-retries 30 --socket-timeout 300 --retries 10 --verbose --force-ipv4 --no-check-certificate --external-downloader aria2c --downloader-args 'aria2c: -x 16 -j 32'"
-
+                        download_cmd = f"{cmd} -R 25 --fragment-retries 25"
                         os.system(download_cmd)
                         copy = await bot.send_document(chat_id=m.chat.id, document=f'{name}.pdf', caption=cc1)
                         count += 1
