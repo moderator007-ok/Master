@@ -361,8 +361,7 @@ async def change_caption_caption(client, message):
 async def main():
     await asyncio.gather(uploader_bot.start(), caption_bot.start())
     print("Both bots have started.")
-    await uploader_bot.run_until_disconnected()
-    await caption_bot.run_until_disconnected()
+    await asyncio.gather(uploader_bot.idle(), caption_bot.idle())
     await asyncio.gather(uploader_bot.stop(), caption_bot.stop())
 
 if __name__ == "__main__":
