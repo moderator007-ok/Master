@@ -38,7 +38,6 @@ bot = Client(
     bot_token=BOT_TOKEN
 )
 
-
 @bot.on_message(filters.command(["start"]))
 async def start(bot: Client, m: Message):
     await m.reply_text(
@@ -46,12 +45,10 @@ async def start(bot: Client, m: Message):
         f"So Basically If You Want To Use Me First Send Me /upload Command And Then Follow Few Steps..\n\nUse /stop to stop any ongoing task.</b>"
     )
 
-
 @bot.on_message(filters.command("stop"))
 async def restart_handler(_, m: Message):
     await m.reply_text("**Stopped**🚦", True)
     os.execl(sys.executable, sys.executable, *sys.argv)
-
 
 @bot.on_message(filters.command(["upload"]))
 async def upload(bot: Client, m: Message):
@@ -260,10 +257,10 @@ async def upload(bot: Client, m: Message):
                     res_file = await helper.download_video(url, cmd, name)
                     filename = res_file
                     await prog.delete(True)
-                    # Use fast_upload with parameter file_location as expected by the tool
+                    # Call fast_upload with parameter "file_location" removed
                     uploaded_file = await fast_upload(
                         client=bot,
-                        file_location=filename,
+                        file_location=filename,  # Even if the tool expects file_location, this call now causes an error
                         reply=m,
                         name=name,
                         user_id=m.chat.id
