@@ -25,7 +25,7 @@ from pyrogram.errors.exceptions.bad_request_400 import StickerEmojiInvalid
 from pyrogram.types.messages_and_media import message
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-# Import fast_upload functionality from devgagantools.spylib.
+# Import fast_upload function from devgagantools.spylib.
 try:
     from devgagantools.spylib import fast_upload
 except ImportError:
@@ -58,7 +58,6 @@ async def upload(bot: Client, m: Message):
     await input.delete(True)
 
     path = f"./downloads/{m.chat.id}"
-
     try:
         with open(x, "r") as f:
             content = f.read()
@@ -257,10 +256,10 @@ async def upload(bot: Client, m: Message):
                     res_file = await helper.download_video(url, cmd, name)
                     filename = res_file
                     await prog.delete(True)
-                    # Call fast_upload with parameter "file_location" removed
+                    # Call fast_upload with parameter "file" as expected
                     uploaded_file = await fast_upload(
                         client=bot,
-                        file_location=filename,  # Even if the tool expects file_location, this call now causes an error
+                        file=filename,
                         reply=m,
                         name=name,
                         user_id=m.chat.id
