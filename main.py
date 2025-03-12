@@ -120,13 +120,24 @@ async def upload_handler(event):
         caption = highlighter if caption_input == 'Robin' else caption_input
         await bot.delete_messages(event.chat_id, [q6.id, caption_msg.id])
 
-        # --- Step 7: Ask for thumbnail URL ---
-        q7 = await conv.send_message("Send the thumbnail URL (e.g. https://graph.org/file/ce1723991756e48c35aa1.jpg) or type 'no' for no thumbnail.")
+        # --- Step 7: Ask for thumbnail image ---
+        # Instead of asking for a URL, we ask the user to send a thumbnail image (as a Telegram file)
+        q7 = await conv.send_message("Send a thumbnail image for this batch (or type 'no' to skip and let Telegram auto‑generate one):")
         thumb_msg = await conv.get_response()
-        thumb_input = thumb_msg.text.strip()
+        # Delete the prompt and the reply
         await bot.delete_messages(event.chat_id, [q7.id, thumb_msg.id])
-        # If user enters 'no' or leaves blank, set thumb to None so we let Telegram generate its own thumbnail
-        thumb = thumb_input if (thumb_input.lower() != "no" and thumb_input) else None
+        if thumb_msg.media:
+            # Download the thumbnail file from Telegram
+            thumb_path = await bot.download_media(thumb_msg)
+        else:
+            # If user types text and it is "no", then we set thumb to None
+            thumb_path = None
+            if thumb_msg.text.strip().lower() != "no":
+                # In case of invalid input, treat as no thumbnail
+                thumb_path = None
+
+        # Store the thumbnail for the entire batch (if provided)
+        batch_thumb = thumb_path
 
         status_msg = await conv.send_message("Processing your links...")
 
@@ -250,14 +261,14 @@ async def upload_handler(event):
                         uploaded_file = await fast_upload(bot, file_obj, progress_callback=progress_callback)
                     await bot.delete_messages(event.chat_id, progress_msg.id)
 
-                    # Do not auto-generate a thumbnail; if no thumbnail is provided, let Telegram generate its own.
-                    # Send the uploaded file with streaming enabled and thumbnail if provided.
+                    # Use the manually provided thumbnail for every upload if available;
+                    # otherwise, let Telegram generate its own thumbnail.
                     await bot.send_file(
                         event.chat_id,
                         file=uploaded_file,
                         caption=cc,
                         supports_streaming=True,
-                        thumb=thumb  # If thumb is None, Telegram will handle thumbnail generation.
+                        thumb=batch_thumb
                     )
                     await asyncio.sleep(1)
             except Exception as e:
@@ -265,6 +276,10 @@ async def upload_handler(event):
                 continue
         await conv.send_message("**Done Boss 😎**")
         await bot.delete_messages(event.chat_id, status_msg.id)
+        
+        # If a thumbnail file was provided, delete it after the batch is done.
+        if batch_thumb is not None and os.path.exists(batch_thumb):
+            os.remove(batch_thumb)
 
 def main():
     print("Bot is running...")
