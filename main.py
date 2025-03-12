@@ -9,11 +9,11 @@ import logging
 from telethon import TelegramClient, events
 import aiohttp
 
-# Import configuration variables
+# Import configuration variables from your vars module
 from vars import API_ID, API_HASH, BOT_TOKEN
-import core as helper  # assumes helper.download_video and helper.download exist
+import core as helper  # Assumes helper.download_video() and helper.download() exist
 
-# Import external fast_upload function from devgagantools
+# Import external fast_upload function from devgagantools library
 try:
     from devgagantools.spylib import fast_upload
 except ImportError:
@@ -26,14 +26,24 @@ log = logging.getLogger("telethon")
 # Initialize the Telethon client
 bot = TelegramClient("bot", API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 
+# Helper function: convert bytes to human-readable format
+def human_readable(size, decimal_places=2):
+    for unit in ['B','KB','MB','GB','TB']:
+        if size < 1024:
+            return f"{size:.{decimal_places}f}{unit}"
+        size /= 1024
+    return f"{size:.{decimal_places}f}PB"
+
 @bot.on(events.NewMessage(pattern=r'^/start'))
 async def start_handler(event):
-    await event.reply(
+    msg = await event.reply(
         f"<b>Hello {event.sender.first_name} 👋\n\n"
         "I am a bot that downloads links from your <b>.TXT</b> file and uploads them to Telegram. "
         "To use me, first send /upload and follow the steps. "
         "Send /stop to abort any ongoing task.</b>"
     )
+    await asyncio.sleep(5)
+    await msg.delete()
 
 @bot.on(events.NewMessage(pattern=r'^/stop'))
 async def stop_handler(event):
@@ -43,9 +53,11 @@ async def stop_handler(event):
 @bot.on(events.NewMessage(pattern=r'^/upload'))
 async def upload_handler(event):
     async with bot.conversation(event.chat_id) as conv:
-        # Get the TXT file containing links
-        await conv.send_message("Send TXT file ⚡️")
+        # --- Step 1: Ask for TXT file ---
+        q1 = await conv.send_message("Send TXT file ⚡️")
         txt_msg = await conv.get_response()
+        await conv.delete_message(q1.id)
+        await conv.delete_message(txt_msg.id)
         txt_path = await bot.download_media(txt_msg)
         try:
             with open(txt_path, "r") as f:
@@ -54,32 +66,42 @@ async def upload_handler(event):
             links = [line.split("://", 1) for line in content if line.strip()]
             os.remove(txt_path)
         except Exception as e:
-            await conv.send_message("**Invalid file input.**")
+            err_msg = await conv.send_message("**Invalid file input.**")
+            await asyncio.sleep(3)
+            await conv.delete_message(err_msg.id)
             os.remove(txt_path)
             return
 
-        # Ask if there are password-protected links
-        await conv.send_message("Are there any password-protected links in this file? If yes, send the PW token. If not, type 'no'.")
+        # --- Step 2: Ask for password token ---
+        q2 = await conv.send_message("Are there any password-protected links in this file? If yes, send the PW token. If not, type 'no'.")
         pw_msg = await conv.get_response()
         pw_token = pw_msg.text.strip()
+        await conv.delete_message(q2.id)
+        await conv.delete_message(pw_msg.id)
 
-        # Ask for starting link index
-        await conv.send_message(f"**Total links found:** **{len(links)}**\n\nSend a number indicating from which link you want to start downloading (e.g. 1).")
+        # --- Step 3: Ask for starting link index ---
+        q3 = await conv.send_message(f"**Total links found:** **{len(links)}**\n\nSend a number indicating from which link you want to start downloading (e.g. 1).")
         start_msg = await conv.get_response()
         try:
             count = int(start_msg.text.strip())
         except:
             count = 1
+        await conv.delete_message(q3.id)
+        await conv.delete_message(start_msg.id)
 
-        # Ask for batch name
-        await conv.send_message("Now send me your batch name:")
+        # --- Step 4: Ask for batch name ---
+        q4 = await conv.send_message("Now send me your batch name:")
         batch_msg = await conv.get_response()
         batch_name = batch_msg.text.strip()
+        await conv.delete_message(q4.id)
+        await conv.delete_message(batch_msg.id)
 
-        # Ask for resolution
-        await conv.send_message("Enter resolution (choose: 144, 240, 360, 480, 720, 1080):")
+        # --- Step 5: Ask for resolution ---
+        q5 = await conv.send_message("Enter resolution (choose: 144, 240, 360, 480, 720, 1080):")
         res_msg = await conv.get_response()
         raw_res = res_msg.text.strip()
+        await conv.delete_message(q5.id)
+        await conv.delete_message(res_msg.id)
         if raw_res == "144":
             res = "256x144"
         elif raw_res == "240":
@@ -95,28 +117,29 @@ async def upload_handler(event):
         else:
             res = "UN"
 
-        # Ask for caption
-        await conv.send_message("Now enter a caption for your uploaded file:")
+        # --- Step 6: Ask for caption ---
+        q6 = await conv.send_message("Now enter a caption for your uploaded file:")
         caption_msg = await conv.get_response()
         caption_input = caption_msg.text.strip()
         highlighter = "️ ⁪⁬⁮⁮⁮"
         caption = highlighter if caption_input == 'Robin' else caption_input
+        await conv.delete_message(q6.id)
+        await conv.delete_message(caption_msg.id)
 
-        # Ask for thumbnail URL
-        await conv.send_message("Send the thumbnail URL (e.g. https://graph.org/file/ce1723991756e48c35aa1.jpg) or type 'no' for no thumbnail.")
+        # --- Step 7: Ask for thumbnail URL ---
+        q7 = await conv.send_message("Send the thumbnail URL (e.g. https://graph.org/file/ce1723991756e48c35aa1.jpg) or type 'no' for no thumbnail.")
         thumb_msg = await conv.get_response()
         thumb_input = thumb_msg.text.strip()
-        await conv.send_message("Processing your links...")
-        
-        thumb = thumb_input
-        if thumb.startswith("http://") or thumb.startswith("https://"):
-            subprocess.getstatusoutput(f"wget '{thumb}' -O 'thumb.jpg'")
-            thumb = "thumb.jpg"
-        else:
-            thumb = "no"
+        await conv.delete_message(q7.id)
+        await conv.delete_message(thumb_msg.id)
+        # If user enters 'no' or leaves blank, set thumb to None so that we can auto-generate it later.
+        thumb = thumb_input if (thumb_input.lower() != "no" and thumb_input) else None
 
-        # Process each link starting from the chosen index (count is 1-indexed)
+        status_msg = await conv.send_message("Processing your links...")
+
+        # --- Process each link ---
         for i in range(count - 1, len(links)):
+            # Reconstruct URL
             V = links[i][1].replace("file/d/", "uc?export=download&id=") \
                            .replace("www.youtube-nocookie.com/embed", "youtu.be") \
                            .replace("?modestbranding=1", "") \
@@ -203,18 +226,48 @@ async def upload_handler(event):
                         await asyncio.sleep(5)
                         continue
                 else:
-                    await conv.send_message(f"**⥥ DOWNLOADING... »**\n\n**Name »** `{file_name}`\n**Quality »** {raw_res}\n\n**URL »** `{url}`")
+                    dl_msg = await conv.send_message(f"**⥥ DOWNLOADING... »**\n\n**Name »** `{file_name}`\n**Quality »** {raw_res}\n\n**URL »** `{url}`")
                     res_file = await helper.download_video(url, cmd, file_name)
-                    await conv.send_message("Uploading file...")
-                    # Use external fast_upload and then send file to chat
+                    await dl_msg.delete()
+
+                    # --- UPLOAD WITH PROGRESS ---
+                    progress_msg = await conv.send_message("Uploading file... 0%")
+                    async def progress_callback(current, total):
+                        percent = (current / total) * 100
+                        text = f"Uploading: {percent:.2f}% ({human_readable(current)}/{human_readable(total)})"
+                        try:
+                            await bot.edit_message(event.chat_id, progress_msg.id, text)
+                        except Exception as ex:
+                            log.error(f"Progress update failed: {ex}")
+
                     with open(res_file, "rb") as file_obj:
-                        uploaded_file = await fast_upload(bot, file_obj)
-                    await bot.send_file(event.chat_id, file=uploaded_file, caption=cc)
+                        uploaded_file = await fast_upload(bot, file_obj, progress_callback=progress_callback)
+                    await progress_msg.delete()
+
+                    # --- Auto-generate thumbnail if none provided ---
+                    if thumb is None:
+                        thumb_path = f"{file_name}_thumb.jpg"
+                        ffmpeg_cmd = f"ffmpeg -i {res_file} -ss 00:00:01.000 -vframes 1 {thumb_path}"
+                        subprocess.getstatusoutput(ffmpeg_cmd)
+                        thumb = thumb_path
+
+                    # Send the uploaded file; supports_streaming=True makes it playable
+                    await bot.send_file(
+                        event.chat_id,
+                        file=uploaded_file,
+                        caption=cc,
+                        supports_streaming=True,
+                        thumb=thumb
+                    )
                     await asyncio.sleep(1)
+                    # Clean up auto-generated thumbnail if created
+                    if thumb is not None and thumb.endswith("_thumb.jpg"):
+                        os.remove(thumb)
             except Exception as e:
                 await conv.send_message(f"**Downloading Interrupted**\n{str(e)}\n**Name »** {file_name}\n**URL »** `{url}`")
                 continue
         await conv.send_message("**Done Boss 😎**")
+        await status_msg.delete()
 
 def main():
     print("Bot is running...")
