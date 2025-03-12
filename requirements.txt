@@ -29,4 +29,5 @@ werkzeug==2.0.2
 itsdangerous==2.0.1
 Telethon>=1.37.0
 devgagantools
-MoviePy
+moviepy
+
