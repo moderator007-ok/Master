@@ -1,7 +1,3 @@
-# Don't Remove Credit Tg - @VJ_Botz
-# Subscribe YouTube Channel For Amazing Bot https://youtube.com/@Tech_VJ
-# Ask Doubt on telegram @KingVJ01
-
 import os
 import re
 import sys
@@ -13,7 +9,7 @@ import subprocess
 
 import core as helper
 from utils import progress_bar
-from vars import API_ID, API_HASH, BOT_TOKEN
+from vars import API_ID, API_HASH, BOT_TOKEN  # ensure these are defined
 from aiohttp import ClientSession
 from pyromod import listen
 from subprocess import getstatusoutput
@@ -22,11 +18,10 @@ from pyrogram import Client, filters
 from pyrogram.types import Message
 from pyrogram.errors import FloodWait
 from pyrogram.errors.exceptions.bad_request_400 import StickerEmojiInvalid
-from pyrogram.types.messages_and_media import message
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 # Import the fast upload function from devgagantools.spylib.
-# The updated version now expects no parameters.
+# The new API now expects no parameters.
 try:
     from devgagantools.spylib import fast_upload
 except ImportError:
@@ -39,7 +34,7 @@ bot = Client(
     bot_token=BOT_TOKEN
 )
 
-# (Optional) Monkey-patch the client if needed.
+# Monkey-patch the client if needed.
 if not hasattr(bot, "_get_dc"):
     bot._get_dc = lambda: bot.session.dc_id
 
@@ -47,14 +42,14 @@ if not hasattr(bot, "_get_dc"):
 async def start(bot: Client, m: Message):
     await m.reply_text(
         f"<b>Hello {m.from_user.mention} 👋\n\n"
-        "I Am A Bot For Download Links From Your **.TXT** File And Then Upload That File On Telegram "
-        "So Basically If You Want To Use Me First Send Me /upload Command And Then Follow Few Steps..\n\n"
+        "I Am A Bot For Download Links From Your **.TXT** File And Then Upload That File On Telegram. "
+        "To use me, simply send the /upload command and follow the instructions.\n\n"
         "Use /stop to stop any ongoing task.</b>"
     )
 
 @bot.on_message(filters.command("stop"))
 async def restart_handler(_, m: Message):
-    await m.reply_text("**Stopped**🚦", True)
+    await m.reply_text("**Stopped** 🚦", True)
     os.execl(sys.executable, sys.executable, *sys.argv)
 
 @bot.on_message(filters.command(["upload"]))
@@ -71,7 +66,7 @@ async def upload(bot: Client, m: Message):
         content = content.split("\n")
         links = [i.split("://", 1) for i in content]
         os.remove(x)
-    except:
+    except Exception as e:
         await m.reply_text("**Invalid file input.**")
         os.remove(x)
         return
@@ -82,8 +77,8 @@ async def upload(bot: Client, m: Message):
     await inp_pw.delete(True)
     
     await editable.edit(
-        f"**𝕋ᴏᴛᴀʟ ʟɪɴᴋ𝕤 ғᴏᴜɴᴅ ᴀʀᴇ🔗🔗** **{len(links)}**\n\n"
-        "**𝕊ᴇɴᴅ 𝔽ʀᴏᴍ ᴡʜᴇʀᴇ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ ᴅᴏᴡɴʟᴏᴀᴅ ɪɴɪᴛɪᴀʟ ɪ𝕤** **1**"
+        f"**𝕋ᴏᴛᴀʟ ʟɪɴᴋ𝕤 ғᴏᴜɴᴅ ᴀʀᴇ:** **{len(links)}**\n\n"
+        "**𝕊ᴇɴᴅ 𝔽ʀᴏᴍ ᴡʜᴇʀᴇ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ ᴅᴏᴡɴʟᴏᴀᴅ (Enter a number, e.g. 1)**"
     )
     inp0: Message = await bot.listen(editable.chat.id)
     raw_text = inp0.text
@@ -94,7 +89,7 @@ async def upload(bot: Client, m: Message):
     raw_text0 = inp1.text
     await inp1.delete(True)
     
-    await editable.edit("**𝔼ɴᴛᴇʀ ʀᴇ𝕤ᴏʟᴜᴛɪᴏɴ📸**\n144,240,360,480,720,1080 please choose quality")
+    await editable.edit("**𝔼ɴᴛᴇʀ ʀᴇ𝕤ᴏʟᴜᴛɪᴏɴ 📸**\nChoose: 144, 240, 360, 480, 720, 1080")
     inp2: Message = await bot.listen(editable.chat.id)
     raw_text2 = inp2.text
     await inp2.delete(True)
@@ -116,7 +111,7 @@ async def upload(bot: Client, m: Message):
     except Exception:
         res = "UN"
     
-    await editable.edit("Now Enter A Caption to add caption on your uploaded file")
+    await editable.edit("Now Enter A Caption for your uploaded file")
     inp3: Message = await bot.listen(editable.chat.id)
     raw_text3 = inp3.text
     await inp3.delete(True)
@@ -124,14 +119,14 @@ async def upload(bot: Client, m: Message):
     MR = highlighter if raw_text3 == 'Robin' else raw_text3
        
     await editable.edit(
-        "Now send the Thumb url/nEg » https://graph.org/file/ce1723991756e48c35aa1.jpg \nOr if don't want thumbnail send = no"
+        "Now send the Thumb URL (e.g. https://graph.org/file/ce1723991756e48c35aa1.jpg)\nOr type 'no' if you don't want a thumbnail."
     )
-    inp6 = message = await bot.listen(editable.chat.id)
+    inp6: Message = await bot.listen(editable.chat.id)
     raw_text6 = inp6.text
     await inp6.delete(True)
     await editable.delete()
 
-    thumb = inp6.text
+    thumb = raw_text6
     if thumb.startswith("http://") or thumb.startswith("https://"):
         getstatusoutput(f"wget '{thumb}' -O 'thumb.jpg'")
         thumb = "thumb.jpg"
@@ -147,6 +142,7 @@ async def upload(bot: Client, m: Message):
                            .replace("/view?usp=sharing", "")
             url = "https://" + V
 
+            # Handling special cases based on URL content
             if "visionias" in url:
                 async with ClientSession() as session:
                     async with session.get(url, headers={
@@ -217,7 +213,7 @@ async def upload(bot: Client, m: Message):
                 if "drive" in url:
                     try:
                         ka = await helper.download(url, name)
-                        copy = await bot.send_document(chat_id=m.chat.id, document=ka, caption=cc1)
+                        await bot.send_document(chat_id=m.chat.id, document=ka, caption=cc1)
                         count += 1
                         os.remove(ka)
                         await asyncio.sleep(1)
@@ -237,7 +233,7 @@ async def upload(bot: Client, m: Message):
                         )
                         download_cmd = f"{cmd} -R 25 --fragment-retries 25"
                         os.system(download_cmd)
-                        copy = await bot.send_document(chat_id=m.chat.id, document=f'{name}.pdf', caption=cc1)
+                        await bot.send_document(chat_id=m.chat.id, document=f'{name}.pdf', caption=cc1)
                         count += 1
                         os.remove(f'{name}.pdf')
                         await asyncio.sleep(1)
@@ -251,21 +247,17 @@ async def upload(bot: Client, m: Message):
                     res_file = await helper.download_video(url, cmd, name)
                     filename = res_file
                     await prog.delete(True)
-                    # Open the downloaded file in binary mode and call fast_upload with no parameters.
-                    with open(filename, "rb") as file_obj:
-                        uploaded_file = await fast_upload(
-                            client=bot,
-                            file=file_obj
-                        )
+                    # Use the new fast_upload that expects no parameters.
+                    uploaded_file = await fast_upload()
                     count += 1
                     await asyncio.sleep(1)
             except Exception as e:
                 await m.reply_text(
-                    f"**downloading Interupted **\n{str(e)}\n**Name** » {name}\n**Link** » `{url}`"
+                    f"**Downloading Interrupted**\n{str(e)}\n**Name »** {name}\n**Link »** `{url}`"
                 )
                 continue
     except Exception as e:
-        await m.reply_text(e)
+        await m.reply_text(str(e))
     await m.reply_text("**𝔻ᴏɴᴇ 𝔹ᴏ𝕤𝕤😎**")
 
 bot.run()
