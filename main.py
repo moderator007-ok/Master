@@ -26,7 +26,8 @@ from pyrogram.types.messages_and_media import message
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 # Import the fast uploader module from devgagantools
-from devgagantools import uploader
+from devgagantools.upload import fast_upload
+
 
 bot = Client(
     "bot",
@@ -214,7 +215,7 @@ async def upload(bot: Client, m: Message):
                     filename = res_file
                     await prog.delete(True)
                     # Use fast uploader from devgagantools for Telegram upload
-                    await uploader.fast_upload(bot, m.chat.id, filename, caption=cc, thumb=thumb)
+                    await fast_upload(bot, m.chat.id, filename, caption=cc, thumb=thumb)
                     count += 1
                     await asyncio.sleep(1)
 
