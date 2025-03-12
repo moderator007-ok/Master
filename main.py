@@ -25,7 +25,7 @@ from pyrogram.errors.exceptions.bad_request_400 import StickerEmojiInvalid
 from pyrogram.types.messages_and_media import message
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-# Import fast_upload function from devgagantools.spylib.
+# Import fast_upload from devgagantools.spylib.
 try:
     from devgagantools.spylib import fast_upload
 except ImportError:
@@ -41,8 +41,10 @@ bot = Client(
 @bot.on_message(filters.command(["start"]))
 async def start(bot: Client, m: Message):
     await m.reply_text(
-        f"<b>Hello {m.from_user.mention} 👋\n\n I Am A Bot For Download Links From Your **.TXT** File And Then Upload That File On Telegram "
-        f"So Basically If You Want To Use Me First Send Me /upload Command And Then Follow Few Steps..\n\nUse /stop to stop any ongoing task.</b>"
+        f"<b>Hello {m.from_user.mention} 👋\n\n"
+        "I Am A Bot For Download Links From Your **.TXT** File And Then Upload That File On Telegram "
+        "So Basically If You Want To Use Me First Send Me /upload Command And Then Follow Few Steps..\n\n"
+        "Use /stop to stop any ongoing task.</b>"
     )
 
 @bot.on_message(filters.command("stop"))
@@ -53,18 +55,16 @@ async def restart_handler(_, m: Message):
 @bot.on_message(filters.command(["upload"]))
 async def upload(bot: Client, m: Message):
     editable = await m.reply_text('𝕤ᴇɴᴅ ᴛxᴛ ғɪʟᴇ ⚡️')
-    input: Message = await bot.listen(editable.chat.id)
-    x = await input.download()
-    await input.delete(True)
+    inp: Message = await bot.listen(editable.chat.id)
+    x = await inp.download()
+    await inp.delete(True)
 
     path = f"./downloads/{m.chat.id}"
     try:
         with open(x, "r") as f:
             content = f.read()
         content = content.split("\n")
-        links = []
-        for i in content:
-            links.append(i.split("://", 1))
+        links = [i.split("://", 1) for i in content]
         os.remove(x)
     except:
         await m.reply_text("**Invalid file input.**")
@@ -72,26 +72,27 @@ async def upload(bot: Client, m: Message):
         return
 
     await editable.edit("Are there any password-protected links in this file? If yes, please send the PW token. If not, type 'no'.")
-    input_pw: Message = await bot.listen(editable.chat.id)
-    pw_token = input_pw.text.strip()
-    await input_pw.delete(True)
+    inp_pw: Message = await bot.listen(editable.chat.id)
+    pw_token = inp_pw.text.strip()
+    await inp_pw.delete(True)
     
     await editable.edit(
-        f"**𝕋ᴏᴛᴀʟ ʟɪɴᴋ𝕤 ғᴏᴜɴᴅ ᴀʀᴇ🔗🔗** **{len(links)}**\n\n**𝕊ᴇɴᴅ 𝔽ʀᴏᴍ ᴡʜᴇʀᴇ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ ᴅᴏᴡɴʟᴏᴀᴅ ɪɴɪᴛɪᴀʟ ɪ𝕤** **1**"
+        f"**𝕋ᴏᴛᴀʟ ʟɪɴᴋ𝕤 ғᴏᴜɴᴅ ᴀʀᴇ🔗🔗** **{len(links)}**\n\n"
+        "**𝕊ᴇɴᴅ 𝔽ʀᴏᴍ ᴡʜᴇʀᴇ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ ᴅᴏᴡɴʟᴏᴀᴅ ɪɴɪᴛɪᴀʟ ɪ𝕤** **1**"
     )
-    input0: Message = await bot.listen(editable.chat.id)
-    raw_text = input0.text
-    await input0.delete(True)
+    inp0: Message = await bot.listen(editable.chat.id)
+    raw_text = inp0.text
+    await inp0.delete(True)
 
     await editable.edit("**Now Please Send Me Your Batch Name**")
-    input1: Message = await bot.listen(editable.chat.id)
-    raw_text0 = input1.text
-    await input1.delete(True)
+    inp1: Message = await bot.listen(editable.chat.id)
+    raw_text0 = inp1.text
+    await inp1.delete(True)
     
     await editable.edit("**𝔼ɴᴛᴇʀ ʀᴇ𝕤ᴏʟᴜᴛɪᴏɴ📸**\n144,240,360,480,720,1080 please choose quality")
-    input2: Message = await bot.listen(editable.chat.id)
-    raw_text2 = input2.text
-    await input2.delete(True)
+    inp2: Message = await bot.listen(editable.chat.id)
+    raw_text2 = inp2.text
+    await inp2.delete(True)
     try:
         if raw_text2 == "144":
             res = "256x144"
@@ -111,35 +112,28 @@ async def upload(bot: Client, m: Message):
         res = "UN"
     
     await editable.edit("Now Enter A Caption to add caption on your uploaded file")
-    input3: Message = await bot.listen(editable.chat.id)
-    raw_text3 = input3.text
-    await input3.delete(True)
+    inp3: Message = await bot.listen(editable.chat.id)
+    raw_text3 = inp3.text
+    await inp3.delete(True)
     highlighter = f"️ ⁪⁬⁮⁮⁮"
-    if raw_text3 == 'Robin':
-        MR = highlighter
-    else:
-        MR = raw_text3
+    MR = highlighter if raw_text3 == 'Robin' else raw_text3
        
     await editable.edit(
-        "Now send the Thumb url/nEg » https://graph.org/file/ce1723991756e48c35aa1.jpg \n Or if don't want thumbnail send = no"
+        "Now send the Thumb url/nEg » https://graph.org/file/ce1723991756e48c35aa1.jpg \nOr if don't want thumbnail send = no"
     )
-    input6 = message = await bot.listen(editable.chat.id)
-    raw_text6 = input6.text
-    await input6.delete(True)
+    inp6 = message = await bot.listen(editable.chat.id)
+    raw_text6 = inp6.text
+    await inp6.delete(True)
     await editable.delete()
 
-    thumb = input6.text
+    thumb = inp6.text
     if thumb.startswith("http://") or thumb.startswith("https://"):
         getstatusoutput(f"wget '{thumb}' -O 'thumb.jpg'")
         thumb = "thumb.jpg"
     else:
-        thumb == "no"
+        thumb = "no"
 
-    if len(links) == 1:
-        count = 1
-    else:
-        count = int(raw_text)
-
+    count = 1 if len(links) == 1 else int(raw_text)
     try:
         for i in range(count - 1, len(links)):
             V = links[i][1].replace("file/d/", "uc?export=download&id=") \
@@ -174,7 +168,6 @@ async def upload(bot: Client, m: Message):
                     f'https://api.classplusapp.com/cams/uploader/video/jw-signed-url?url={url}',
                     headers={
                         'x-access-token': 'eyJhbGciOiJIUzM4NCIsInR5cCI6IkpXVCJ9.eyJpZCI6MzgzNjkyMTIsIm9yZ0lkIjoyNjA1LCJ0eXBlIjoxLCJtb2JpbGUiOiI5MTcwODI3NzQyODkiLCJuYW1lIjoiQWNlIiwiZW1haWwiOm51bGwsImlzRmlyc3RMb2dpbiI6dHJ1ZSwiZGVmYXVsdExhbmd1YWdlIjpudWxsLCJjb3VudHJ5Q29kZSI6IklOIiwiaXNJbnRlcm5hdGlvbmFsIjowLCJpYXQiOjE2NDMyODE4NzcsImV4cCI6MTY0Mzg4NjY3N30.hM33P2ai6ivdzxPPfm01LAd4JWv-vnrSxGXqvCirCSpUfhhofpeqyeHPxtstXwe0'
-                    }
                 ).json()['url']
 
             elif '/master.mpd' in url:
@@ -256,12 +249,10 @@ async def upload(bot: Client, m: Message):
                     res_file = await helper.download_video(url, cmd, name)
                     filename = res_file
                     await prog.delete(True)
-                    # Call fast_upload with parameter "file" as expected
+                    # Call fast_upload with only required parameters.
                     uploaded_file = await fast_upload(
                         client=bot,
                         file=filename,
-                        reply=m,
-                        name=name,
                         user_id=m.chat.id
                     )
                     count += 1
