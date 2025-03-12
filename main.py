@@ -25,6 +25,8 @@ from pyrogram.errors.exceptions.bad_request_400 import StickerEmojiInvalid
 from pyrogram.types.messages_and_media import message
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
+# Import the fast uploader module from devgaganin/devgagantools
+from devgagantools import uploader
 
 bot = Client(
     "bot",
@@ -211,7 +213,8 @@ async def upload(bot: Client, m: Message):
                     res_file = await helper.download_video(url, cmd, name)
                     filename = res_file
                     await prog.delete(True)
-                    await helper.send_vid(bot, m, cc, filename, thumb, name, prog)
+                    # Use fast uploader from devgagantools for Telegram upload
+                    await uploader.fast_upload(bot, m.chat.id, filename, caption=cc, thumb=thumb)
                     count += 1
                     await asyncio.sleep(1)
 
