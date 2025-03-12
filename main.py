@@ -10,6 +10,7 @@ import time
 import asyncio
 import requests
 import subprocess
+import threading
 
 import core as helper
 from utils import progress_bar
@@ -25,7 +26,7 @@ from pyrogram.errors.exceptions.bad_request_400 import StickerEmojiInvalid
 from pyrogram.types.messages_and_media import message
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-
+# Initialize the bot
 bot = Client(
     "bot",
     api_id=API_ID,
@@ -37,7 +38,8 @@ bot = Client(
 @bot.on_message(filters.command(["start"]))
 async def start(bot: Client, m: Message):
     await m.reply_text(
-        f"<b>Hello {m.from_user.mention} 👋\n\n I Am A Bot For Download Links From Your **.TXT** File And Then Upload That File On Telegram So Basically If You Want To Use Me First Send Me /upload Command And Then Follow Few Steps..\n\nUse /stop to stop any ongoing task.</b>"
+        f"<b>Hello {m.from_user.mention} 👋\n\n I Am A Bot For Download Links From Your **.TXT** File And Then Upload That File On Telegram. "
+        "So basically, if you want to use me, first send me the /upload command and then follow a few steps.\n\nUse /stop to stop any ongoing task.</b>"
     )
 
 
@@ -71,7 +73,8 @@ async def upload(bot: Client, m: Message):
 
     # Ask in advance if there are any password-protected links.
     await editable.edit(
-        f"**𝕋ᴏᴛᴀʟ ʟɪɴᴋ𝕤 ғᴏᴜɴᴅ ᴀʀᴇ 🔗🔗 {len(links)}**\n\nAre there any password-protected links in this file? If yes, please enter the PW token. If not, type 'no'."
+        f"**𝕋ᴏᴛᴀʟ ʟɪɴᴋ𝕤 ғᴏᴜɴᴅ ᴀʀᴇ 🔗🔗 {len(links)}**\n\n"
+        "Are there any password-protected links in this file? If yes, please enter the PW token. If not, type 'no'."
     )
     input_pw: Message = await bot.listen(editable.chat.id)
     pw_token = input_pw.text.strip()
@@ -257,4 +260,24 @@ async def upload(bot: Client, m: Message):
     await m.reply_text("**𝔻ᴏɴᴇ 𝔹ᴏ𝕤𝕤😎**")
 
 
-bot.run()
+# Start a simple Flask web server so that the instance stays alive.
+from flask import Flask
+
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "Bot is Running", 200
+
+def run_web():
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
+
+def run_bot():
+    bot.run()
+
+if __name__ == "__main__":
+    # Run the bot in a separate thread
+    threading.Thread(target=run_bot).start()
+    # Then start the web server in the main thread
+    run_web()
