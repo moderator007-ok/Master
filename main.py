@@ -25,8 +25,11 @@ from pyrogram.errors.exceptions.bad_request_400 import StickerEmojiInvalid
 from pyrogram.types.messages_and_media import message
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-# Import fast_upload function from devgagantools.spylib per the repository guide
-from devgagantools.spylib import fast_upload
+# Try importing fast_upload; if not found, fall back to upload_file renamed as fast_upload.
+try:
+    from devgagantools.spylib import fast_upload
+except ImportError:
+    from devgagantools.spylib import upload_file as fast_upload
 
 bot = Client(
     "bot",
@@ -35,17 +38,14 @@ bot = Client(
     bot_token=BOT_TOKEN
 )
 
-
 @bot.on_message(filters.command(["start"]))
 async def start(bot: Client, m: Message):
     await m.reply_text(f"<b>Hello {m.from_user.mention} 👋\n\n I Am A Bot For Download Links From Your **.TXT** File And Then Upload That File On Telegram So Basically If You Want To Use Me First Send Me /upload Command And Then Follow Few Steps..\n\nUse /stop to stop any ongoing task.</b>")
-
 
 @bot.on_message(filters.command("stop"))
 async def restart_handler(_, m: Message):
     await m.reply_text("**Stopped**🚦", True)
     os.execl(sys.executable, sys.executable, *sys.argv)
-
 
 @bot.on_message(filters.command(["upload"]))
 async def upload(bot: Client, m: Message):
@@ -100,8 +100,8 @@ async def upload(bot: Client, m: Message):
         elif raw_text2 == "720":
             res = "1280x720"
         elif raw_text2 == "1080":
-            res = "1920x1080" 
-        else: 
+            res = "1920x1080"
+        else:
             res = "UN"
     except Exception:
         res = "UN"
@@ -112,7 +112,7 @@ async def upload(bot: Client, m: Message):
     await input3.delete(True)
     highlighter = f"️ ⁪⁬⁮⁮⁮"
     if raw_text3 == 'Robin':
-        MR = highlighter 
+        MR = highlighter
     else:
         MR = raw_text3
        
@@ -249,11 +249,10 @@ async def upload(bot: Client, m: Message):
                     res_file = await helper.download_video(url, cmd, name)
                     filename = res_file
                     await prog.delete(True)
-                    # Call fast_upload with parameters matching the guide
                     uploaded_file = await fast_upload(
                         client=bot,
                         file_location=filename,
-                        reply=m,         # You may adjust this if you have a dedicated reply message
+                        reply=m,
                         name=name,
                         user_id=m.chat.id
                     )
@@ -267,6 +266,5 @@ async def upload(bot: Client, m: Message):
     except Exception as e:
         await m.reply_text(e)
     await m.reply_text("**𝔻ᴏɴᴇ 𝔹ᴏ𝕤𝕤😎**")
-
 
 bot.run()
