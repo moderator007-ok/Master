@@ -26,7 +26,7 @@ from pyrogram.types.messages_and_media import message
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 # Import the fast uploader module from devgagantools
-from devgagantools.upload import fast_upload
+from devgagantools.spylib import fast_upload
 
 
 bot = Client(
