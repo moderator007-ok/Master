@@ -125,7 +125,7 @@ async def upload_handler(event):
         thumb_msg = await conv.get_response()
         thumb_input = thumb_msg.text.strip()
         await bot.delete_messages(event.chat_id, [q7.id, thumb_msg.id])
-        # If user enters 'no' or leaves blank, set thumb to None so we auto-generate it later
+        # If user enters 'no' or leaves blank, set thumb to None so we let Telegram generate its own thumbnail
         thumb = thumb_input if (thumb_input.lower() != "no" and thumb_input) else None
 
         status_msg = await conv.send_message("Processing your links...")
@@ -223,9 +223,8 @@ async def upload_handler(event):
                     res_file = await helper.download_video(url, cmd, file_name)
                     await bot.delete_messages(event.chat_id, dl_msg.id)
 
-                    # --- UPLOAD WITH PROGRESS (update every 5%) ---
+                    # --- UPLOAD WITH PROGRESS (update every ~5%) ---
                     progress_msg = await conv.send_message("Uploading file... 0%")
-                    # Set up a closure to update only every 5%
                     last_percent = 0
                     last_time = time.time()
                     last_bytes = 0
@@ -236,7 +235,6 @@ async def upload_handler(event):
                         if percent - last_percent >= 5 or current == total:
                             now = time.time()
                             dt = now - last_time
-                            # Calculate speed in bytes per second
                             speed = (current - last_bytes) / dt if dt > 0 else 0
                             speed_str = human_readable(speed) + "/s"
                             text = f"Uploading: {percent:.2f}% ({human_readable(current)}/{human_readable(total)}) at {speed_str}"
@@ -252,25 +250,16 @@ async def upload_handler(event):
                         uploaded_file = await fast_upload(bot, file_obj, progress_callback=progress_callback)
                     await bot.delete_messages(event.chat_id, progress_msg.id)
 
-                    # --- Auto-generate thumbnail if none provided ---
-                    if thumb is None:
-                        thumb_path = f"{file_name}_thumb.jpg"
-                        ffmpeg_cmd = f"ffmpeg -i {res_file} -ss 00:00:01.000 -vframes 1 {thumb_path}"
-                        subprocess.getstatusoutput(ffmpeg_cmd)
-                        thumb = thumb_path
-
-                    # Send the uploaded file with streaming enabled and thumbnail (auto‑generated or provided)
+                    # Do not auto-generate a thumbnail; if no thumbnail is provided, let Telegram generate its own.
+                    # Send the uploaded file with streaming enabled and thumbnail if provided.
                     await bot.send_file(
                         event.chat_id,
                         file=uploaded_file,
                         caption=cc,
                         supports_streaming=True,
-                        thumb=thumb
+                        thumb=thumb  # If thumb is None, Telegram will handle thumbnail generation.
                     )
                     await asyncio.sleep(1)
-                    # Clean up auto-generated thumbnail if created
-                    if thumb is not None and thumb.endswith("_thumb.jpg"):
-                        os.remove(thumb)
             except Exception as e:
                 await conv.send_message(f"**Downloading Interrupted**\n{str(e)}\n**Name »** {file_name}\n**URL »** `{url}`")
                 continue
