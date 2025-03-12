@@ -25,7 +25,7 @@ from pyrogram.errors.exceptions.bad_request_400 import StickerEmojiInvalid
 from pyrogram.types.messages_and_media import message
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-# Import the fast uploader module from devgaganin/devgagantools
+# Import the fast uploader module from devgagantools
 from devgagantools import uploader
 
 bot = Client(
@@ -174,9 +174,9 @@ async def upload(bot: Client, m: Message):
                 ytf = f"b[height<={raw_text2}]/bv[height<={raw_text2}]+ba/b/bv+ba"
 
             if "jw-prod" in url:
-                cmd = f'yt-dlp --external-downloader aria2c --external-downloader-args "-x 16 -s 16 -k 1M" -o "{name}.mp4" "{url}"'
+                cmd = f'yt-dlp --external-downloader aria2c --external-downloader-args "-x 16 -s 16 -k 1M --max-download-limit=0 --max-overall-download-limit=0 --enable-http-pipelining=true --file-allocation=falloc" -o "{name}.mp4" "{url}"'
             else:
-                cmd = f'yt-dlp --external-downloader aria2c --external-downloader-args "-x 16 -s 16 -k 1M" -f "{ytf}" "{url}" -o "{name}.mp4"'
+                cmd = f'yt-dlp --external-downloader aria2c --external-downloader-args "-x 16 -s 16 -k 1M --max-download-limit=0 --max-overall-download-limit=0 --enable-http-pipelining=true --file-allocation=falloc" -f "{ytf}" "{url}" -o "{name}.mp4"'
 
             try:  
                 
@@ -196,7 +196,7 @@ async def upload(bot: Client, m: Message):
                 
                 elif ".pdf" in url:
                     try:
-                        cmd = f'yt-dlp --external-downloader aria2c --external-downloader-args "-x 16 -s 16 -k 1M" -o "{name}.pdf" "{url}"'
+                        cmd = f'yt-dlp --external-downloader aria2c --external-downloader-args "-x 16 -s 16 -k 1M --max-download-limit=0 --max-overall-download-limit=0 --enable-http-pipelining=true --file-allocation=falloc" -o "{name}.pdf" "{url}"'
                         download_cmd = f"{cmd} -R 25 --fragment-retries 25"
                         os.system(download_cmd)
                         copy = await bot.send_document(chat_id=m.chat.id, document=f'{name}.pdf', caption=cc1)
