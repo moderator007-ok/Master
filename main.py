@@ -25,7 +25,7 @@ from pyrogram.errors.exceptions.bad_request_400 import StickerEmojiInvalid
 from pyrogram.types.messages_and_media import message
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-# Import fast_upload function from devgagantools.spylib.
+# Import fast_upload from devgagantools.spylib.
 try:
     from devgagantools.spylib import fast_upload
 except ImportError:
@@ -169,17 +169,9 @@ async def upload(bot: Client, m: Message):
                     'x-access-token': 'eyJhbGciOiJIUzM4NCIsInR5cCI6IkpXVCJ9.eyJpZCI6MzgzNjkyMTIsIm9yZ0lkIjoyNjA1LCJ0eXBlIjoxLCJtb2JpbGUiOiI5MTcwODI3NzQyODkiLCJuYW1lIjoiQWNlIiwiZW1haWwiOm51bGwsImlzRmlyc3RMb2dpbiI6dHJ1ZSwiZGVmYXVsdExhbmd1YWdlIjpudWxsLCJjb3VudHJ5Q29kZSI6IklOIiwiaXNJbnRlcm5hdGlvbmFsIjowLCJpYXQiOjE2NDMyODE4NzcsImV4cCI6MTY0Mzg4NjY3N30.hM33P2ai6ivdzxPPfm01LAd4JWv-vnrSxGXqvCirCSpUfhhofpeqyeHPxtstXwe0'
                 }).json()['url']
 
-            elif '/master.mpd' in url:
-                if "d1d34p8vz63oiq.cloudfront.net" in url:
-                    if pw_token.lower() != "no":
-                        url = ("https://madxapi-d0cbf6ac738c.herokuapp.com/"
-                               "fbd49ea2-9d41-4024-91b9-3c323de4c691/master.m3u8?token=" + pw_token)
-                    else:
-                        id = url.split("/")[-2]
-                        url = "https://d26g5bnklkwsh4.cloudfront.net/" + id + "/master.m3u8"
-                else:
-                    id = url.split("/")[-2]
-                    url = "https://d26g5bnklkwsh4.cloudfront.net/" + id + "/master.m3u8"
+            # New block: if URL contains "d1d34p8vz63oiq" or "sec1.pw.live", rewrite it
+            elif "d1d34p8vz63oiq" in url or "sec1.pw.live" in url:
+                url = f"https://anonymouspwplayer-b99f57957198.herokuapp.com/pw?url={url}?token={pw_token}"
 
             name1 = links[i][0].replace("\t", "").replace(":", "").replace("/", "") \
                                .replace("+", "").replace("#", "").replace("|", "") \
@@ -251,8 +243,7 @@ async def upload(bot: Client, m: Message):
                     res_file = await helper.download_video(url, cmd, name)
                     filename = res_file
                     await prog.delete(True)
-                    # Call fast_upload with required parameter "file_location" removed;
-                    # use parameter "file" as expected by the function.
+                    # Call fast_upload with required parameter "file" (the downloaded file)
                     uploaded_file = await fast_upload(
                         client=bot,
                         file=filename,
