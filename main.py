@@ -25,7 +25,7 @@ from pyrogram.errors.exceptions.bad_request_400 import StickerEmojiInvalid
 from pyrogram.types.messages_and_media import message
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-# Import fast_upload function from devgagantools.spylib
+# Import fast_upload function from devgagantools.spylib per the repository guide
 from devgagantools.spylib import fast_upload
 
 bot = Client(
@@ -249,7 +249,14 @@ async def upload(bot: Client, m: Message):
                     res_file = await helper.download_video(url, cmd, name)
                     filename = res_file
                     await prog.delete(True)
-                    await fast_upload(bot, m.chat.id, filename, caption=cc, thumb=thumb)
+                    # Call fast_upload with parameters matching the guide
+                    uploaded_file = await fast_upload(
+                        client=bot,
+                        file_location=filename,
+                        reply=m,         # You may adjust this if you have a dedicated reply message
+                        name=name,
+                        user_id=m.chat.id
+                    )
                     count += 1
                     await asyncio.sleep(1)
             except Exception as e:
