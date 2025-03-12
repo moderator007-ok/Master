@@ -158,10 +158,10 @@ async def upload(bot: Client, m: Message):
                      url = "https://madxapi-d0cbf6ac738c.herokuapp.com/fbd49ea2-9d41-4024-91b9-3c323de4c691/master.m3u8?token=" + pw_token
                  else:
                      id =  url.split("/")[-2]
-                     url =  "https://d26g5bnklkwsh4.cloudfront.net/" + id + "/master.m3u8"
+                     url = "https://d26g5bnklkwsh4.cloudfront.net/" + id + "/master.m3u8"
              else:
                  id =  url.split("/")[-2]
-                 url =  "https://d26g5bnklkwsh4.cloudfront.net/" + id + "/master.m3u8"
+                 url = "https://d26g5bnklkwsh4.cloudfront.net/" + id + "/master.m3u8"
 
             name1 = links[i][0].replace("\t", "").replace(":", "").replace("/", "").replace("+", "").replace("#", "").replace("|", "").replace("@", "").replace("*", "").replace(".", "").replace("https", "").replace("http", "").strip()
             name = f'{str(count).zfill(3)}) {name1[:60]}'
@@ -172,9 +172,9 @@ async def upload(bot: Client, m: Message):
                 ytf = f"b[height<={raw_text2}]/bv[height<={raw_text2}]+ba/b/bv+ba"
 
             if "jw-prod" in url:
-                cmd = f'yt-dlp -o "{name}.mp4" "{url}"'
+                cmd = f'yt-dlp --external-downloader aria2c --external-downloader-args "-x 16 -s 16 -k 1M" -o "{name}.mp4" "{url}"'
             else:
-                cmd = f'yt-dlp -f "{ytf}" "{url}" -o "{name}.mp4"'
+                cmd = f'yt-dlp --external-downloader aria2c --external-downloader-args "-x 16 -s 16 -k 1M" -f "{ytf}" "{url}" -o "{name}.mp4"'
 
             try:  
                 
@@ -186,23 +186,24 @@ async def upload(bot: Client, m: Message):
                         copy = await bot.send_document(chat_id=m.chat.id,document=ka, caption=cc1)
                         count+=1
                         os.remove(ka)
-                        time.sleep(1)
+                        await asyncio.sleep(1)
                     except FloodWait as e:
                         await m.reply_text(str(e))
-                        time.sleep(e.x)
+                        await asyncio.sleep(e.x)
                         continue
                 
                 elif ".pdf" in url:
                     try:
-                        cmd = f'yt-dlp -o "{name}.pdf" "{url}"'
+                        cmd = f'yt-dlp --external-downloader aria2c --external-downloader-args "-x 16 -s 16 -k 1M" -o "{name}.pdf" "{url}"'
                         download_cmd = f"{cmd} -R 25 --fragment-retries 25"
                         os.system(download_cmd)
                         copy = await bot.send_document(chat_id=m.chat.id, document=f'{name}.pdf', caption=cc1)
                         count += 1
                         os.remove(f'{name}.pdf')
+                        await asyncio.sleep(1)
                     except FloodWait as e:
                         await m.reply_text(str(e))
-                        time.sleep(e.x)
+                        await asyncio.sleep(e.x)
                         continue
                 else:
                     Show = f"**⥥ 🄳🄾🅆🄽🄻🄾🄰🄳🄸🄽🄶⬇️⬇️... »**\n\n**📝Name »** `{name}\n❄Quality » {raw_text2}`\n\n**🔗URL »** `{url}`"
@@ -212,7 +213,7 @@ async def upload(bot: Client, m: Message):
                     await prog.delete(True)
                     await helper.send_vid(bot, m, cc, filename, thumb, name, prog)
                     count += 1
-                    time.sleep(1)
+                    await asyncio.sleep(1)
 
             except Exception as e:
                 await m.reply_text(
