@@ -125,7 +125,7 @@ async def upload_handler(event):
         thumb_msg = await conv.get_response()
         thumb_input = thumb_msg.text.strip()
         await bot.delete_messages(event.chat_id, [q7.id, thumb_msg.id])
-        # If user enters 'no' or leaves blank, set thumb to None so we auto-generate later
+        # If user enters 'no' or leaves blank, set thumb to None so we auto-generate it later
         thumb = thumb_input if (thumb_input.lower() != "no" and thumb_input) else None
 
         status_msg = await conv.send_message("Processing your links...")
@@ -223,15 +223,31 @@ async def upload_handler(event):
                     res_file = await helper.download_video(url, cmd, file_name)
                     await bot.delete_messages(event.chat_id, dl_msg.id)
 
-                    # --- UPLOAD WITH PROGRESS ---
+                    # --- UPLOAD WITH PROGRESS (update every 5%) ---
                     progress_msg = await conv.send_message("Uploading file... 0%")
+                    # Set up a closure to update only every 5%
+                    last_percent = 0
+                    last_time = time.time()
+                    last_bytes = 0
+
                     async def progress_callback(current, total):
+                        nonlocal last_percent, last_time, last_bytes
                         percent = (current / total) * 100
-                        text = f"Uploading: {percent:.2f}% ({human_readable(current)}/{human_readable(total)})"
-                        try:
-                            await bot.edit_message(event.chat_id, progress_msg.id, text)
-                        except Exception as ex:
-                            log.error(f"Progress update failed: {ex}")
+                        if percent - last_percent >= 5 or current == total:
+                            now = time.time()
+                            dt = now - last_time
+                            # Calculate speed in bytes per second
+                            speed = (current - last_bytes) / dt if dt > 0 else 0
+                            speed_str = human_readable(speed) + "/s"
+                            text = f"Uploading: {percent:.2f}% ({human_readable(current)}/{human_readable(total)}) at {speed_str}"
+                            try:
+                                await bot.edit_message(event.chat_id, progress_msg.id, text)
+                            except Exception as ex:
+                                log.error(f"Progress update failed: {ex}")
+                            last_percent = percent
+                            last_time = now
+                            last_bytes = current
+
                     with open(res_file, "rb") as file_obj:
                         uploaded_file = await fast_upload(bot, file_obj, progress_callback=progress_callback)
                     await bot.delete_messages(event.chat_id, progress_msg.id)
@@ -243,7 +259,7 @@ async def upload_handler(event):
                         subprocess.getstatusoutput(ffmpeg_cmd)
                         thumb = thumb_path
 
-                    # Send the uploaded file; supports_streaming=True makes it playable
+                    # Send the uploaded file with streaming enabled and thumbnail (auto‑generated or provided)
                     await bot.send_file(
                         event.chat_id,
                         file=uploaded_file,
