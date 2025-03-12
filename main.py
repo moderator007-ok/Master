@@ -13,7 +13,6 @@ import math
 from collections import defaultdict
 from typing import Optional, List, AsyncGenerator, Union, Awaitable, DefaultDict, Tuple, BinaryIO
 
-# Additional imports
 import aiohttp
 from telethon import TelegramClient, events, utils, helpers
 from telethon.network import MTProtoSender
@@ -22,6 +21,10 @@ from telethon.tl.functions import InvokeWithLayerRequest
 from telethon.tl.functions.auth import ExportAuthorizationRequest, ImportAuthorizationRequest
 from telethon.tl.functions.upload import GetFileRequest, SaveFilePartRequest, SaveBigFilePartRequest
 from telethon.tl.types import Document, InputFileLocation, InputDocumentFileLocation, InputPeerPhotoFileLocation, InputPhotoFileLocation, TypeInputFile, InputFileBig, InputFile
+
+# Import your config variables as before
+from vars import API_ID, API_HASH, BOT_TOKEN
+import core as helper  # assuming you have your helper functions in this module
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -230,25 +233,13 @@ async def upload_file(client: TelegramClient, file: BinaryIO, progress_callback:
     res = (await _internal_transfer_to_telegram(client, file, progress_callback))[0]
     return res
 
-# Create a fast_upload alias for later use
+# Alias fast_upload for later use
 fast_upload = upload_file
 # ========= End of Fast Upload Code =========
 
 # ========= Telethon Bot Setup =========
-# Replace these with your own credentials
-API_ID = YOUR_API_ID         # e.g., 1234567
-API_HASH = "YOUR_API_HASH"   # e.g., "abcdef123456..."
-BOT_TOKEN = "YOUR_BOT_TOKEN" # e.g., "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
-
 bot = TelegramClient("bot", API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 
-# ========= Helper (Assumed Existing Functions) =========
-# It is assumed you have a 'helper' module that defines download() and download_video() functions.
-# If not, replace these calls with your own download implementations.
-import core as helper
-# ======================================================
-
-# ========= Command Handlers =========
 @bot.on(events.NewMessage(pattern=r'^/start'))
 async def start_handler(event):
     await event.reply(
@@ -265,7 +256,6 @@ async def stop_handler(event):
 
 @bot.on(events.NewMessage(pattern=r'^/upload'))
 async def upload_handler(event):
-    # Use Telethon's conversation helper for interactive steps
     async with bot.conversation(event.chat_id) as conv:
         await conv.send_message("Send TXT file ⚡️")
         txt_msg = await conv.get_response()
@@ -337,7 +327,6 @@ async def upload_handler(event):
         except:
             count = 1
 
-        # Process each link
         for i in range(count - 1, len(links)):
             V = links[i][1].replace("file/d/", "uc?export=download&id=") \
                            .replace("www.youtube-nocookie.com/embed", "youtu.be") \
@@ -345,7 +334,6 @@ async def upload_handler(event):
                            .replace("/view?usp=sharing", "")
             url = "https://" + V
 
-            # Special URL processing
             if "visionias" in url:
                 async with aiohttp.ClientSession() as session:
                     async with session.get(url, headers={
@@ -371,7 +359,7 @@ async def upload_handler(event):
             elif 'videos.classplusapp' in url:
                 api_url = "https://api.classplusapp.com/cams/uploader/video/jw-signed-url?url=" + url
                 url = requests.get(api_url, headers={
-                    'x-access-token': 'TOKEN'  # Replace TOKEN if needed
+                    'x-access-token': 'TOKEN'
                 }).json()['url']
             elif '/master.mpd' in url:
                 if "d1d34p8vz63oiq" in url or "sec1.pw.live" in url:
@@ -435,7 +423,6 @@ async def upload_handler(event):
                 continue
         await conv.send_message("**Done Boss 😎**")
 
-# ========= Run the Bot =========
 def main():
     print("Bot is running...")
     bot.run_until_disconnected()
