@@ -6,33 +6,16 @@ import time
 import asyncio
 import requests
 import subprocess
-
-import core as helper
-from utils import progress_bar
-from vars import API_ID, API_HASH, BOT_TOKEN
-from aiohttp import ClientSession
-from pyromod import listen
-from subprocess import getstatusoutput
-
-from pyrogram import Client, filters
-from pyrogram.types import Message
-from pyrogram.errors import FloodWait
-from pyrogram.errors.exceptions.bad_request_400 import StickerEmojiInvalid
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-
-# ========= Telethon Fast Upload Code (Embedded) =========
-# This code is taken from the Telethon parallel file transfer implementation.
-# It provides a fast_upload function that expects a Telethon client.
-# (A minimal monkey-patch is provided below for compatibility.)
-import asyncio
+import logging
 import hashlib
 import inspect
-import logging
 import math
 from collections import defaultdict
 from typing import Optional, List, AsyncGenerator, Union, Awaitable, DefaultDict, Tuple, BinaryIO
 
-from telethon import utils, helpers, TelegramClient
+# Additional imports
+import aiohttp
+from telethon import TelegramClient, events, utils, helpers
 from telethon.network import MTProtoSender
 from telethon.tl.alltlobjects import LAYER
 from telethon.tl.functions import InvokeWithLayerRequest
@@ -40,8 +23,11 @@ from telethon.tl.functions.auth import ExportAuthorizationRequest, ImportAuthori
 from telethon.tl.functions.upload import GetFileRequest, SaveFilePartRequest, SaveBigFilePartRequest
 from telethon.tl.types import Document, InputFileLocation, InputDocumentFileLocation, InputPeerPhotoFileLocation, InputPhotoFileLocation, TypeInputFile, InputFileBig, InputFile
 
+# Set up logging
+logging.basicConfig(level=logging.INFO)
 log: logging.Logger = logging.getLogger("telethon")
 
+# ========= Telethon Fast Upload Code =========
 TypeLocation = Union[
     Document,
     InputFileLocation,
@@ -244,122 +230,114 @@ async def upload_file(client: TelegramClient, file: BinaryIO, progress_callback:
     res = (await _internal_transfer_to_telegram(client, file, progress_callback))[0]
     return res
 
-# Create a fast_upload alias so that your later code need not change.
+# Create a fast_upload alias for later use
 fast_upload = upload_file
-# ========= End of Telethon Fast Upload Code =========
+# ========= End of Fast Upload Code =========
 
-# ========= Minimal Monkey-Patch for Telethon Compatibility =========
-# Since your bot uses Pyrogram’s Client (not Telethon’s), we add a basic stub for _get_dc.
-# Note that a complete implementation would require more methods.
-if not hasattr(Client, "_get_dc"):
-    Client._get_dc = lambda self, dc_id=None: self.session.dc_id
-# =============================================================
+# ========= Telethon Bot Setup =========
+# Replace these with your own credentials
+API_ID = YOUR_API_ID         # e.g., 1234567
+API_HASH = "YOUR_API_HASH"   # e.g., "abcdef123456..."
+BOT_TOKEN = "YOUR_BOT_TOKEN" # e.g., "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
 
-# ========= Bot Code =========
-bot = Client(
-    "bot",
-    api_id=API_ID,
-    api_hash=API_HASH,
-    bot_token=BOT_TOKEN
-)
+bot = TelegramClient("bot", API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 
-@bot.on_message(filters.command(["start"]))
-async def start(bot: Client, m: Message):
-    await m.reply_text(
-        f"<b>Hello {m.from_user.mention} 👋\n\n"
-        "I am a bot that downloads links from your **.TXT** file and uploads them to Telegram. "
+# ========= Helper (Assumed Existing Functions) =========
+# It is assumed you have a 'helper' module that defines download() and download_video() functions.
+# If not, replace these calls with your own download implementations.
+import core as helper
+# ======================================================
+
+# ========= Command Handlers =========
+@bot.on(events.NewMessage(pattern=r'^/start'))
+async def start_handler(event):
+    await event.reply(
+        f"<b>Hello {event.sender.first_name} 👋\n\n"
+        "I am a bot that downloads links from your <b>.TXT</b> file and uploads them to Telegram. "
         "To use me, first send /upload and follow the steps. "
         "Send /stop to abort any ongoing task.</b>"
     )
 
-@bot.on_message(filters.command("stop"))
-async def stop_handler(_, m: Message):
-    await m.reply_text("**Stopped** 🚦", True)
+@bot.on(events.NewMessage(pattern=r'^/stop'))
+async def stop_handler(event):
+    await event.reply("**Stopped** 🚦")
     os.execl(sys.executable, sys.executable, *sys.argv)
 
-@bot.on_message(filters.command(["upload"]))
-async def upload(bot: Client, m: Message):
-    editable = await m.reply_text('Send TXT file ⚡️')
-    inp: Message = await bot.listen(editable.chat.id)
-    txt_path = await inp.download()
-    await inp.delete(True)
-    path = f"./downloads/{m.chat.id}"
-    try:
-        with open(txt_path, "r") as f:
-            content = f.read()
-        content = content.split("\n")
-        links = [line.split("://", 1) for line in content if line.strip()]
-        os.remove(txt_path)
-    except Exception as e:
-        await m.reply_text("**Invalid file input.**")
-        os.remove(txt_path)
-        return
+@bot.on(events.NewMessage(pattern=r'^/upload'))
+async def upload_handler(event):
+    # Use Telethon's conversation helper for interactive steps
+    async with bot.conversation(event.chat_id) as conv:
+        await conv.send_message("Send TXT file ⚡️")
+        txt_msg = await conv.get_response()
+        txt_path = await bot.download_media(txt_msg)
+        try:
+            with open(txt_path, "r") as f:
+                content = f.read()
+            content = content.splitlines()
+            links = [line.split("://", 1) for line in content if line.strip()]
+            os.remove(txt_path)
+        except Exception as e:
+            await conv.send_message("**Invalid file input.**")
+            os.remove(txt_path)
+            return
 
-    await editable.edit("Are there any password-protected links in this file? If yes, send the PW token. If not, type 'no'.")
-    inp_pw: Message = await bot.listen(editable.chat.id)
-    pw_token = inp_pw.text.strip()
-    await inp_pw.delete(True)
-    
-    await editable.edit(
-        f"**Total links found:** **{len(links)}**\n\n"
-        "Send a number indicating from which link you want to start downloading (e.g. 1)."
-    )
-    inp0: Message = await bot.listen(editable.chat.id)
-    raw_text = inp0.text
-    await inp0.delete(True)
+        await conv.send_message("Are there any password-protected links in this file? If yes, send the PW token. If not, type 'no'.")
+        pw_msg = await conv.get_response()
+        pw_token = pw_msg.text.strip()
+        
+        await conv.send_message(f"**Total links found:** **{len(links)}**\n\nSend a number indicating from which link you want to start downloading (e.g. 1).")
+        start_msg = await conv.get_response()
+        raw_text = start_msg.text.strip()
 
-    await editable.edit("Now send me your batch name:")
-    inp1: Message = await bot.listen(editable.chat.id)
-    batch_name = inp1.text
-    await inp1.delete(True)
-    
-    await editable.edit("Enter resolution (choose: 144, 240, 360, 480, 720, 1080):")
-    inp2: Message = await bot.listen(editable.chat.id)
-    raw_text2 = inp2.text
-    await inp2.delete(True)
-    try:
-        if raw_text2 == "144":
-            res = "256x144"
-        elif raw_text2 == "240":
-            res = "426x240"
-        elif raw_text2 == "360":
-            res = "640x360"
-        elif raw_text2 == "480":
-            res = "854x480"
-        elif raw_text2 == "720":
-            res = "1280x720"
-        elif raw_text2 == "1080":
-            res = "1920x1080"
-        else:
+        await conv.send_message("Now send me your batch name:")
+        batch_msg = await conv.get_response()
+        batch_name = batch_msg.text.strip()
+        
+        await conv.send_message("Enter resolution (choose: 144, 240, 360, 480, 720, 1080):")
+        res_msg = await conv.get_response()
+        raw_text2 = res_msg.text.strip()
+        try:
+            if raw_text2 == "144":
+                res = "256x144"
+            elif raw_text2 == "240":
+                res = "426x240"
+            elif raw_text2 == "360":
+                res = "640x360"
+            elif raw_text2 == "480":
+                res = "854x480"
+            elif raw_text2 == "720":
+                res = "1280x720"
+            elif raw_text2 == "1080":
+                res = "1920x1080"
+            else:
+                res = "UN"
+        except Exception:
             res = "UN"
-    except Exception:
-        res = "UN"
-    
-    await editable.edit("Now enter a caption for your uploaded file:")
-    inp3: Message = await bot.listen(editable.chat.id)
-    caption_input = inp3.text
-    await inp3.delete(True)
-    highlighter = "️ ⁪⁬⁮⁮⁮"
-    caption = highlighter if caption_input == 'Robin' else caption_input
-       
-    await editable.edit(
-        "Send the thumbnail URL (e.g. https://graph.org/file/ce1723991756e48c35aa1.jpg) "
-        "or type 'no' for no thumbnail."
-    )
-    inp6: Message = await bot.listen(editable.chat.id)
-    thumb_input = inp6.text
-    await inp6.delete(True)
-    await editable.delete()
+        
+        await conv.send_message("Now enter a caption for your uploaded file:")
+        caption_msg = await conv.get_response()
+        caption_input = caption_msg.text.strip()
+        highlighter = "️ ⁪⁬⁮⁮⁮"
+        caption = highlighter if caption_input == 'Robin' else caption_input
+        
+        await conv.send_message("Send the thumbnail URL (e.g. https://graph.org/file/ce1723991756e48c35aa1.jpg) or type 'no' for no thumbnail.")
+        thumb_msg = await conv.get_response()
+        thumb_input = thumb_msg.text.strip()
+        await conv.send_message("Processing your links...")
+        
+        thumb = thumb_input
+        if thumb.startswith("http://") or thumb.startswith("https://"):
+            subprocess.getstatusoutput(f"wget '{thumb}' -O 'thumb.jpg'")
+            thumb = "thumb.jpg"
+        else:
+            thumb = "no"
+        
+        try:
+            count = 1 if len(links) == 1 else int(raw_text)
+        except:
+            count = 1
 
-    thumb = thumb_input
-    if thumb.startswith("http://") or thumb.startswith("https://"):
-        getstatusoutput(f"wget '{thumb}' -O 'thumb.jpg'")
-        thumb = "thumb.jpg"
-    else:
-        thumb = "no"
-
-    count = 1 if len(links) == 1 else int(raw_text)
-    try:
+        # Process each link
         for i in range(count - 1, len(links)):
             V = links[i][1].replace("file/d/", "uc?export=download&id=") \
                            .replace("www.youtube-nocookie.com/embed", "youtu.be") \
@@ -367,8 +345,9 @@ async def upload(bot: Client, m: Message):
                            .replace("/view?usp=sharing", "")
             url = "https://" + V
 
+            # Special URL processing
             if "visionias" in url:
-                async with ClientSession() as session:
+                async with aiohttp.ClientSession() as session:
                     async with session.get(url, headers={
                         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
                         'Accept-Language': 'en-US,en;q=0.9',
@@ -386,11 +365,13 @@ async def upload(bot: Client, m: Message):
                         'sec-ch-ua-platform': '"Android"'
                     }) as resp:
                         text = await resp.text()
-                        url = re.search(r"(https://.*?playlist.m3u8.*?)\"", text).group(1)
+                        m = re.search(r"(https://.*?playlist.m3u8.*?)\"", text)
+                        if m:
+                            url = m.group(1)
             elif 'videos.classplusapp' in url:
                 api_url = "https://api.classplusapp.com/cams/uploader/video/jw-signed-url?url=" + url
                 url = requests.get(api_url, headers={
-                    'x-access-token': TOKEN
+                    'x-access-token': 'TOKEN'  # Replace TOKEN if needed
                 }).json()['url']
             elif '/master.mpd' in url:
                 if "d1d34p8vz63oiq" in url or "sec1.pw.live" in url:
@@ -398,6 +379,7 @@ async def upload(bot: Client, m: Message):
                 else:
                     id_part = url.split("/")[-2]
                     url = "https://d26g5bnklkwsh4.cloudfront.net/" + id_part + "/master.m3u8"
+
             name1 = links[i][0].replace("\t", "").replace(":", "").replace("/", "") \
                                .replace("+", "").replace("#", "").replace("|", "") \
                                .replace("@", "").replace("*", "").replace(".", "") \
@@ -408,80 +390,55 @@ async def upload(bot: Client, m: Message):
             else:
                 ytf = f"b[height<={raw_text2}]/bv[height<={raw_text2}]+ba/b/bv+ba"
             if "jw-prod" in url:
-                cmd = (
-                    f'yt-dlp --external-downloader aria2c '
-                    f'--external-downloader-args "-x 16 -s 16 -k 1M '
-                    f'--timeout=120 --connect-timeout=120 '
-                    f'--max-download-limit=0 --max-overall-download-limit=0 '
-                    f'--enable-http-pipelining=true --file-allocation=falloc" '
-                    f'-o "{file_name}.mp4" "{url}"'
-                )
+                cmd = f'yt-dlp --external-downloader aria2c --external-downloader-args "-x 16 -s 16 -k 1M --timeout=120 --connect-timeout=120 --max-download-limit=0 --max-overall-download-limit=0 --enable-http-pipelining=true --file-allocation=falloc" -o "{file_name}.mp4" "{url}"'
             else:
-                cmd = (
-                    f'yt-dlp --external-downloader aria2c '
-                    f'--external-downloader-args "-x 16 -s 16 -k 1M '
-                    f'--timeout=120 --connect-timeout=120 '
-                    f'--max-download-limit=0 --max-overall-download-limit=0 '
-                    f'--enable-http-pipelining=true --file-allocation=falloc" '
-                    f'-f "{ytf}" "{url}" -o "{file_name}.mp4"'
-                )
+                cmd = f'yt-dlp --external-downloader aria2c --external-downloader-args "-x 16 -s 16 -k 1M --timeout=120 --connect-timeout=120 --max-download-limit=0 --max-overall-download-limit=0 --enable-http-pipelining=true --file-allocation=falloc" -f "{ytf}" "{url}" -o "{file_name}.mp4"'
             try:
                 cc = f'**{str(count).zfill(3)}**. {name1}{caption}.mkv\n**Batch Name »** {batch_name}\n**Downloaded By :** TechMon ❤️‍🔥 @TechMonX'
                 cc1 = f'**{str(count).zfill(3)}**. {name1}{caption}.pdf\n**Batch Name »** {batch_name}\n**Downloaded By :** TechMon ❤️‍🔥 @TechMonX'
                 if "drive" in url:
                     try:
                         ka = await helper.download(url, file_name)
-                        await bot.send_document(chat_id=m.chat.id, document=ka, caption=cc1)
+                        await bot.send_file(event.chat_id, file=ka, caption=cc1)
                         count += 1
                         os.remove(ka)
                         await asyncio.sleep(1)
-                    except FloodWait as e:
-                        await m.reply_text(str(e))
-                        await asyncio.sleep(e.x)
+                    except Exception as e:
+                        await conv.send_message(str(e))
+                        await asyncio.sleep(5)
                         continue
                 elif ".pdf" in url:
                     try:
-                        cmd = (
-                            f'yt-dlp --external-downloader aria2c '
-                            f'--external-downloader-args "-x 16 -s 16 -k 1M '
-                            f'--timeout=120 --connect-timeout=120 '
-                            f'--max-download-limit=0 --max-overall-download-limit=0 '
-                            f'--enable-http-pipelining=true --file-allocation=falloc" '
-                            f'-o "{file_name}.pdf" "{url}"'
-                        )
+                        cmd = f'yt-dlp --external-downloader aria2c --external-downloader-args "-x 16 -s 16 -k 1M --timeout=120 --connect-timeout=120 --max-download-limit=0 --max-overall-download-limit=0 --enable-http-pipelining=true --file-allocation=falloc" -o "{file_name}.pdf" "{url}"'
                         download_cmd = f"{cmd} -R 25 --fragment-retries 25"
                         os.system(download_cmd)
-                        await bot.send_document(chat_id=m.chat.id, document=f'{file_name}.pdf', caption=cc1)
+                        await bot.send_file(event.chat_id, file=f'{file_name}.pdf', caption=cc1)
                         count += 1
                         os.remove(f'{file_name}.pdf')
                         await asyncio.sleep(1)
-                    except FloodWait as e:
-                        await m.reply_text(str(e))
-                        await asyncio.sleep(e.x)
+                    except Exception as e:
+                        await conv.send_message(str(e))
+                        await asyncio.sleep(5)
                         continue
                 else:
-                    show_msg = (
-                        f"**⥥ DOWNLOADING... »**\n\n"
-                        f"**📝Name »** `{file_name}`\n"
-                        f"**❄Quality »** {raw_text2}\n\n"
-                        f"**🔗URL »** `{url}`"
-                    )
-                    prog = await m.reply_text(show_msg)
+                    show_msg = f"**⥥ DOWNLOADING... »**\n\n**📝Name »** `{file_name}`\n**❄Quality »** {raw_text2}\n\n**🔗URL »** `{url}`"
+                    status_msg = await conv.send_message(show_msg)
                     res_file = await helper.download_video(url, cmd, file_name)
                     filename = res_file
-                    await prog.delete(True)
-                    # Open the downloaded file and pass it along with the client to the upload function.
+                    await status_msg.delete()
                     with open(filename, "rb") as file_obj:
                         uploaded_file = await fast_upload(bot, file_obj)
                     count += 1
                     await asyncio.sleep(1)
             except Exception as e:
-                await m.reply_text(
-                    f"**Downloading Interrupted**\n{str(e)}\n**Name »** {file_name}\n**Link »** `{url}`"
-                )
+                await conv.send_message(f"**Downloading Interrupted**\n{str(e)}\n**Name »** {file_name}\n**Link »** `{url}`")
                 continue
-    except Exception as e:
-        await m.reply_text(str(e))
-    await m.reply_text("**Done Boss 😎**")
+        await conv.send_message("**Done Boss 😎**")
 
-bot.run()
+# ========= Run the Bot =========
+def main():
+    print("Bot is running...")
+    bot.run_until_disconnected()
+
+if __name__ == '__main__':
+    main()
