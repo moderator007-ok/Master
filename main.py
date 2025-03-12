@@ -25,12 +25,8 @@ from pyrogram.errors.exceptions.bad_request_400 import StickerEmojiInvalid
 from pyrogram.types.messages_and_media import message
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-# Store the x-access-token in a variable to avoid syntax issues.
-TOKEN = ("eyJhbGciOiJIUzM4NCIsInR5cCI6IkpXVCJ9."
-         "eyJpZCI6MzgzNjkyMTIsIm9yZ0lkIjoyNjA1LCJ0eXBlIjoxLCJtb2JpbGUiOiI5MTcwODI3NzQyODkiLCJuYW1lIjoiQWNlIiwiZW1haWwiOm51bGwsImlzRmlyc3RMb2dpbiI6dHJ1ZSwiZGVmYXVsdExhbmd1YWdlIjpudWxsLCJjb3VudHJ5Q29kZSI6IklOIiwiaXNJbnRlcm5hdGlvbmFsIjowLCJpYXQiOjE2NDMyODE4NzcsImV4cCI6MTY0Mzg4NjY3N30."
-         "hM33P2ai6ivdzxPPfm01LAd4JWv-vnrSxGXqvCirCSpUfhhofpeqyeHPxtstXwe0")
-
-# Import fast_upload from devgagantools.spylib.
+# Import the fast upload function from devgagantools.spylib.
+# The updated version now expects no parameters.
 try:
     from devgagantools.spylib import fast_upload
 except ImportError:
@@ -43,7 +39,7 @@ bot = Client(
     bot_token=BOT_TOKEN
 )
 
-# (Optional) Monkey-patch _get_dc if needed.
+# (Optional) Monkey-patch the client if needed.
 if not hasattr(bot, "_get_dc"):
     bot._get_dc = lambda: bot.session.dc_id
 
@@ -255,7 +251,7 @@ async def upload(bot: Client, m: Message):
                     res_file = await helper.download_video(url, cmd, name)
                     filename = res_file
                     await prog.delete(True)
-                    # Open the downloaded file in binary mode and pass it to fast_upload
+                    # Open the downloaded file in binary mode and call fast_upload with no parameters.
                     with open(filename, "rb") as file_obj:
                         uploaded_file = await fast_upload(
                             client=bot,
