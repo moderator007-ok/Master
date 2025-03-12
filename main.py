@@ -9,13 +9,11 @@ import logging
 from telethon import TelegramClient, events
 import aiohttp
 
-# Import your configuration variables
+# Import configuration variables
 from vars import API_ID, API_HASH, BOT_TOKEN
+import core as helper  # assumes helper.download_video and helper.download exist
 
-# Import your helper functions (e.g. for video downloads)
-import core as helper
-
-# Import the external fast_upload function from devgagantools library.
+# Import external fast_upload function from devgagantools
 try:
     from devgagantools.spylib import fast_upload
 except ImportError:
@@ -28,7 +26,6 @@ log = logging.getLogger("telethon")
 # Initialize the Telethon client
 bot = TelegramClient("bot", API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 
-# /start command
 @bot.on(events.NewMessage(pattern=r'^/start'))
 async def start_handler(event):
     await event.reply(
@@ -38,24 +35,21 @@ async def start_handler(event):
         "Send /stop to abort any ongoing task.</b>"
     )
 
-# /stop command – this restarts the process
 @bot.on(events.NewMessage(pattern=r'^/stop'))
 async def stop_handler(event):
     await event.reply("**Stopped** 🚦")
     os.execl(sys.executable, sys.executable, *sys.argv)
 
-# /upload command – interactive conversation using Telethon's conversation helper
 @bot.on(events.NewMessage(pattern=r'^/upload'))
 async def upload_handler(event):
     async with bot.conversation(event.chat_id) as conv:
-        # Ask for the TXT file containing the links
+        # Get the TXT file containing links
         await conv.send_message("Send TXT file ⚡️")
         txt_msg = await conv.get_response()
         txt_path = await bot.download_media(txt_msg)
         try:
             with open(txt_path, "r") as f:
                 content = f.read()
-            # Split file into lines and then by "://"
             content = content.splitlines()
             links = [line.split("://", 1) for line in content if line.strip()]
             os.remove(txt_path)
@@ -64,11 +58,11 @@ async def upload_handler(event):
             os.remove(txt_path)
             return
 
-        # Ask for password token if any
+        # Ask if there are password-protected links
         await conv.send_message("Are there any password-protected links in this file? If yes, send the PW token. If not, type 'no'.")
         pw_msg = await conv.get_response()
         pw_token = pw_msg.text.strip()
-        
+
         # Ask for starting link index
         await conv.send_message(f"**Total links found:** **{len(links)}**\n\nSend a number indicating from which link you want to start downloading (e.g. 1).")
         start_msg = await conv.get_response()
@@ -81,7 +75,7 @@ async def upload_handler(event):
         await conv.send_message("Now send me your batch name:")
         batch_msg = await conv.get_response()
         batch_name = batch_msg.text.strip()
-        
+
         # Ask for resolution
         await conv.send_message("Enter resolution (choose: 144, 240, 360, 480, 720, 1080):")
         res_msg = await conv.get_response()
@@ -100,16 +94,15 @@ async def upload_handler(event):
             res = "1920x1080"
         else:
             res = "UN"
-        
+
         # Ask for caption
         await conv.send_message("Now enter a caption for your uploaded file:")
         caption_msg = await conv.get_response()
         caption_input = caption_msg.text.strip()
-        # For example, use a special highlighter if caption is exactly 'Robin'
         highlighter = "️ ⁪⁬⁮⁮⁮"
         caption = highlighter if caption_input == 'Robin' else caption_input
-        
-        # Ask for thumbnail URL (optional)
+
+        # Ask for thumbnail URL
         await conv.send_message("Send the thumbnail URL (e.g. https://graph.org/file/ce1723991756e48c35aa1.jpg) or type 'no' for no thumbnail.")
         thumb_msg = await conv.get_response()
         thumb_input = thumb_msg.text.strip()
@@ -117,22 +110,20 @@ async def upload_handler(event):
         
         thumb = thumb_input
         if thumb.startswith("http://") or thumb.startswith("https://"):
-            # Download thumbnail using a system call to wget (or implement your own downloader)
             subprocess.getstatusoutput(f"wget '{thumb}' -O 'thumb.jpg'")
             thumb = "thumb.jpg"
         else:
             thumb = "no"
 
-        # Process each link starting from the given count (1-indexed)
+        # Process each link starting from the chosen index (count is 1-indexed)
         for i in range(count - 1, len(links)):
-            # Reconstruct URL from the parts (this assumes the link split by "://")
             V = links[i][1].replace("file/d/", "uc?export=download&id=") \
                            .replace("www.youtube-nocookie.com/embed", "youtu.be") \
                            .replace("?modestbranding=1", "") \
                            .replace("/view?usp=sharing", "")
             url = "https://" + V
 
-            # Special URL processing for certain hosts
+            # Special URL processing
             if "visionias" in url:
                 async with aiohttp.ClientSession() as session:
                     async with session.get(url, headers={
@@ -158,8 +149,6 @@ async def upload_handler(event):
                                .replace("@", "").replace("*", "").replace(".", "") \
                                .replace("https", "").replace("http", "").strip()
             file_name = f'{str(i+1).zfill(3)}) {name1[:60]}'
-
-            # Choose format strings based on whether the URL is from YouTube
             if "youtu" in url:
                 ytf = f"b[height<={raw_res}][ext=mp4]/bv[height<={raw_res}][ext=mp4]+ba[ext=m4a]/b[ext=mp4]"
             else:
@@ -182,12 +171,10 @@ async def upload_handler(event):
                     f'-f "{ytf}" "{url}" -o "{file_name}.mp4"'
                 )
             try:
-                # Build captions for different file types
                 cc = f'**{str(i+1).zfill(3)}**. {name1}{caption}.mkv\n**Batch Name »** {batch_name}\n**Downloaded By :** TechMon ❤️‍🔥 @TechMonX'
                 cc1 = f'**{str(i+1).zfill(3)}**. {name1}{caption}.pdf\n**Batch Name »** {batch_name}\n**Downloaded By :** TechMon ❤️‍🔥 @TechMonX'
                 if "drive" in url:
                     try:
-                        # For drive links, use your helper.download() function
                         ka = await helper.download(url, file_name)
                         await conv.send_message("Uploading document...")
                         await bot.send_file(event.chat_id, file=ka, caption=cc1)
@@ -217,12 +204,12 @@ async def upload_handler(event):
                         continue
                 else:
                     await conv.send_message(f"**⥥ DOWNLOADING... »**\n\n**Name »** `{file_name}`\n**Quality »** {raw_res}\n\n**URL »** `{url}`")
-                    # Download the video using your helper.download_video (which calls yt-dlp)
                     res_file = await helper.download_video(url, cmd, file_name)
-                    # Use Telethon’s normal file upload: open file and call fast_upload from devgagantools
+                    await conv.send_message("Uploading file...")
+                    # Use external fast_upload and then send file to chat
                     with open(res_file, "rb") as file_obj:
-                        await conv.send_message("Uploading file...")
                         uploaded_file = await fast_upload(bot, file_obj)
+                    await bot.send_file(event.chat_id, file=uploaded_file, caption=cc)
                     await asyncio.sleep(1)
             except Exception as e:
                 await conv.send_message(f"**Downloading Interrupted**\n{str(e)}\n**Name »** {file_name}\n**URL »** `{url}`")
