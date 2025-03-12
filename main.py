@@ -243,11 +243,10 @@ async def upload(bot: Client, m: Message):
                     res_file = await helper.download_video(url, cmd, name)
                     filename = res_file
                     await prog.delete(True)
-                    # Call fast_upload with required parameter "file" (the downloaded file)
+                    # Call fast_upload with only required parameter "file"
                     uploaded_file = await fast_upload(
                         client=bot,
-                        file=filename,
-                        user_id=m.chat.id
+                        file=filename
                     )
                     count += 1
                     await asyncio.sleep(1)
