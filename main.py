@@ -69,9 +69,15 @@ async def upload(bot: Client, m: Message):
         os.remove(x)
         return
 
+    # Ask in advance if there are any password-protected links.
     await editable.edit(
-        f"**𝕋ᴏᴛᴀʟ ʟɪɴᴋ𝕤 ғᴏᴜɴᴅ ᴀʀᴇ🔗🔗** **{len(links)}**\n\n**𝕊ᴇɴᴅ 𝔽ʀᴏᴍ ᴡʜᴇʀᴇ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ ᴅᴏᴡɴʟᴏᴀᴅ ɪɴɪᴛɪᴀʟ ɪ𝕤** **1**"
+        f"**𝕋ᴏᴛᴀʟ ʟɪɴᴋ𝕤 ғᴏᴜɴᴅ ᴀʀᴇ 🔗🔗 {len(links)}**\n\nAre there any password-protected links in this file? If yes, please enter the PW token. If not, type 'no'."
     )
+    input_pw: Message = await bot.listen(editable.chat.id)
+    pw_token = input_pw.text.strip()
+    await input_pw.delete(True)
+
+    await editable.edit("**𝕊ᴇɴᴅ 𝔽ʀᴏᴍ ᴡʜᴇʀᴇ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ ᴅᴏᴡɴʟᴏᴀᴅ ɪɴɪᴛɪᴀʟ ɪ𝕤** **1**")
     input0: Message = await bot.listen(editable.chat.id)
     raw_text = input0.text
     await input0.delete(True)
@@ -114,7 +120,7 @@ async def upload(bot: Client, m: Message):
         MR = raw_text3
 
     await editable.edit(
-        "Now send the Thumb url/nEg » https://graph.org/file/ce1723991756e48c35aa1.jpg \n Or if don't want thumbnail send = no"
+        "Now send the Thumb url/nEg » https://graph.org/file/ce1723991756e48c35aa1.jpg \nOr if you don't want a thumbnail send = no"
     )
     input6 = message = await bot.listen(editable.chat.id)
     raw_text6 = input6.text
@@ -174,13 +180,15 @@ async def upload(bot: Client, m: Message):
                 ).json()['url']
 
             elif '/master.mpd' in url:
+                # If the link is from the specific Cloudfront domain,
+                # use the pre-provided PW token (if any) to convert the URL.
                 if "d1d34p8vz63oiq.cloudfront.net" in url:
-                    await m.reply_text("The link appears to be password-protected. Please enter the PW token:")
-                    input_pw: Message = await bot.listen(m.chat.id)
-                    token = input_pw.text.strip()
-                    await input_pw.delete(True)
-                    url = ("https://madxapi-d0cbf6ac738c.herokuapp.com/fbd49ea2-9d41-4024-91b9-3c323de4c691/"
-                           "master.m3u8?token=" + token)
+                    if pw_token.lower() != "no":
+                        url = ("https://madxapi-d0cbf6ac738c.herokuapp.com/fbd49ea2-9d41-4024-91b9-3c323de4c691/"
+                               "master.m3u8?token=" + pw_token)
+                    else:
+                        id = url.split("/")[-2]
+                        url = "https://d26g5bnklkwsh4.cloudfront.net/" + id + "/master.m3u8"
                 else:
                     id = url.split("/")[-2]
                     url = "https://d26g5bnklkwsh4.cloudfront.net/" + id + "/master.m3u8"
@@ -240,7 +248,7 @@ async def upload(bot: Client, m: Message):
 
             except Exception as e:
                 await m.reply_text(
-                    f"**downloading Interupted **\n{str(e)}\n**Name** » {name}\n**Link** » `{url}`"
+                    f"**Downloading Interrupted**\n{str(e)}\n**Name** » {name}\n**Link** » `{url}`"
                 )
                 continue
 
