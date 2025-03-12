@@ -25,10 +25,12 @@ from pyrogram.errors.exceptions.bad_request_400 import StickerEmojiInvalid
 from pyrogram.types.messages_and_media import message
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-# Try importing fast_upload; if not found, fall back to upload_file renamed as fast_upload.
+# Import the fast_upload function from devgagantools.spylib.
+# Based on the repository README, the function should accept 'filepath' (not file_location)
 try:
     from devgagantools.spylib import fast_upload
 except ImportError:
+    # Fallback: if the function is named differently, adjust here
     from devgagantools.spylib import upload_file as fast_upload
 
 bot = Client(
@@ -38,14 +40,20 @@ bot = Client(
     bot_token=BOT_TOKEN
 )
 
+
 @bot.on_message(filters.command(["start"]))
 async def start(bot: Client, m: Message):
-    await m.reply_text(f"<b>Hello {m.from_user.mention} 👋\n\n I Am A Bot For Download Links From Your **.TXT** File And Then Upload That File On Telegram So Basically If You Want To Use Me First Send Me /upload Command And Then Follow Few Steps..\n\nUse /stop to stop any ongoing task.</b>")
+    await m.reply_text(
+        f"<b>Hello {m.from_user.mention} 👋\n\n I Am A Bot For Download Links From Your **.TXT** File And Then Upload That File On Telegram "
+        f"So Basically If You Want To Use Me First Send Me /upload Command And Then Follow Few Steps..\n\nUse /stop to stop any ongoing task.</b>"
+    )
+
 
 @bot.on_message(filters.command("stop"))
 async def restart_handler(_, m: Message):
     await m.reply_text("**Stopped**🚦", True)
     os.execl(sys.executable, sys.executable, *sys.argv)
+
 
 @bot.on_message(filters.command(["upload"]))
 async def upload(bot: Client, m: Message):
@@ -174,7 +182,8 @@ async def upload(bot: Client, m: Message):
             elif '/master.mpd' in url:
                 if "d1d34p8vz63oiq.cloudfront.net" in url:
                     if pw_token.lower() != "no":
-                        url = "https://madxapi-d0cbf6ac738c.herokuapp.com/fbd49ea2-9d41-4024-91b9-3c323de4c691/master.m3u8?token=" + pw_token
+                        url = ("https://madxapi-d0cbf6ac738c.herokuapp.com/"
+                               "fbd49ea2-9d41-4024-91b9-3c323de4c691/master.m3u8?token=" + pw_token)
                     else:
                         id = url.split("/")[-2]
                         url = "https://d26g5bnklkwsh4.cloudfront.net/" + id + "/master.m3u8"
@@ -249,9 +258,10 @@ async def upload(bot: Client, m: Message):
                     res_file = await helper.download_video(url, cmd, name)
                     filename = res_file
                     await prog.delete(True)
+                    # Use fast_upload with updated parameter name "filepath"
                     uploaded_file = await fast_upload(
                         client=bot,
-                        file_location=filename,
+                        filepath=filename,
                         reply=m,
                         name=name,
                         user_id=m.chat.id
