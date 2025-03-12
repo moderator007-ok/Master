@@ -169,9 +169,12 @@ async def upload(bot: Client, m: Message):
                     'x-access-token': 'eyJhbGciOiJIUzM4NCIsInR5cCI6IkpXVCJ9.eyJpZCI6MzgzNjkyMTIsIm9yZ0lkIjoyNjA1LCJ0eXBlIjoxLCJtb2JpbGUiOiI5MTcwODI3NzQyODkiLCJuYW1lIjoiQWNlIiwiZW1haWwiOm51bGwsImlzRmlyc3RMb2dpbiI6dHJ1ZSwiZGVmYXVsdExhbmd1YWdlIjpudWxsLCJjb3VudHJ5Q29kZSI6IklOIiwiaXNJbnRlcm5hdGlvbmFsIjowLCJpYXQiOjE2NDMyODE4NzcsImV4cCI6MTY0Mzg4NjY3N30.hM33P2ai6ivdzxPPfm01LAd4JWv-vnrSxGXqvCirCSpUfhhofpeqyeHPxtstXwe0'
                 }).json()['url']
 
-            # New block: if URL contains "d1d34p8vz63oiq" or "sec1.pw.live", rewrite it
-            elif "d1d34p8vz63oiq" in url or "sec1.pw.live" in url:
-                url = f"https://anonymouspwplayer-b99f57957198.herokuapp.com/pw?url={url}?token={pw_token}"
+            elif '/master.mpd' in url:
+                if "d1d34p8vz63oiq" in url or "sec1.pw.live" in url:
+                    url = f"https://anonymouspwplayer-b99f57957198.herokuapp.com/pw?url={url}?token={pw_token}"
+                else:
+                    id = url.split("/")[-2]
+                    url = "https://d26g5bnklkwsh4.cloudfront.net/" + id + "/master.m3u8"
 
             name1 = links[i][0].replace("\t", "").replace(":", "").replace("/", "") \
                                .replace("+", "").replace("#", "").replace("|", "") \
@@ -243,11 +246,12 @@ async def upload(bot: Client, m: Message):
                     res_file = await helper.download_video(url, cmd, name)
                     filename = res_file
                     await prog.delete(True)
-                    # Call fast_upload with only required parameter "file"
-                    uploaded_file = await fast_upload(
-                        client=bot,
-                        file=filename
-                    )
+                    # Open file in binary mode and pass it to fast_upload.
+                    with open(filename, "rb") as file_obj:
+                        uploaded_file = await fast_upload(
+                            client=bot,
+                            file=file_obj
+                        )
                     count += 1
                     await asyncio.sleep(1)
             except Exception as e:
