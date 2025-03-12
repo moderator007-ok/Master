@@ -25,7 +25,7 @@ from pyrogram.errors.exceptions.bad_request_400 import StickerEmojiInvalid
 from pyrogram.types.messages_and_media import message
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-# Import fast_upload from devgagantools.spylib.
+# Import fast_upload function from devgagantools.spylib.
 try:
     from devgagantools.spylib import fast_upload
 except ImportError:
@@ -164,11 +164,10 @@ async def upload(bot: Client, m: Message):
                         url = re.search(r"(https://.*?playlist.m3u8.*?)\"", text).group(1)
 
             elif 'videos.classplusapp' in url:
-                # Use concatenation to build API URL, avoiding f-string issues.
                 api_url = "https://api.classplusapp.com/cams/uploader/video/jw-signed-url?url=" + url
                 url = requests.get(api_url, headers={
-                        'x-access-token': 'eyJhbGciOiJIUzM4NCIsInR5cCI6IkpXVCJ9.eyJpZCI6MzgzNjkyMTIsIm9yZ0lkIjoyNjA1LCJ0eXBlIjoxLCJtb2JpbGUiOiI5MTcwODI3NzQyODkiLCJuYW1lIjoiQWNlIiwiZW1haWwiOm51bGwsImlzRmlyc3RMb2dpbiI6dHJ1ZSwiZGVmYXVsdExhbmd1YWdlIjpudWxsLCJjb3VudHJ5Q29kZSI6IklOIiwiaXNJbnRlcm5hdGlvbmFsIjowLCJpYXQiOjE2NDMyODE4NzcsImV4cCI6MTY0Mzg4NjY3N30.hM33P2ai6ivdzxPPfm01LAd4JWv-vnrSxGXqvCirCSpUfhhofpeqyeHPxtstXwe0'
-                    }).json()['url']
+                    'x-access-token': 'eyJhbGciOiJIUzM4NCIsInR5cCI6IkpXVCJ9.eyJpZCI6MzgzNjkyMTIsIm9yZ0lkIjoyNjA1LCJ0eXBlIjoxLCJtb2JpbGUiOiI5MTcwODI3NzQyODkiLCJuYW1lIjoiQWNlIiwiZW1haWwiOm51bGwsImlzRmlyc3RMb2dpbiI6dHJ1ZSwiZGVmYXVsdExhbmd1YWdlIjpudWxsLCJjb3VudHJ5Q29kZSI6IklOIiwiaXNJbnRlcm5hdGlvbmFsIjowLCJpYXQiOjE2NDMyODE4NzcsImV4cCI6MTY0Mzg4NjY3N30.hM33P2ai6ivdzxPPfm01LAd4JWv-vnrSxGXqvCirCSpUfhhofpeqyeHPxtstXwe0'
+                }).json()['url']
 
             elif '/master.mpd' in url:
                 if "d1d34p8vz63oiq.cloudfront.net" in url:
@@ -197,6 +196,7 @@ async def upload(bot: Client, m: Message):
                 cmd = (
                     f'yt-dlp --external-downloader aria2c '
                     f'--external-downloader-args "-x 16 -s 16 -k 1M '
+                    f'--timeout=120 --connect-timeout=120 '
                     f'--max-download-limit=0 --max-overall-download-limit=0 '
                     f'--enable-http-pipelining=true --file-allocation=falloc" '
                     f'-o "{name}.mp4" "{url}"'
@@ -205,6 +205,7 @@ async def upload(bot: Client, m: Message):
                 cmd = (
                     f'yt-dlp --external-downloader aria2c '
                     f'--external-downloader-args "-x 16 -s 16 -k 1M '
+                    f'--timeout=120 --connect-timeout=120 '
                     f'--max-download-limit=0 --max-overall-download-limit=0 '
                     f'--enable-http-pipelining=true --file-allocation=falloc" '
                     f'-f "{ytf}" "{url}" -o "{name}.mp4"'
@@ -229,6 +230,7 @@ async def upload(bot: Client, m: Message):
                         cmd = (
                             f'yt-dlp --external-downloader aria2c '
                             f'--external-downloader-args "-x 16 -s 16 -k 1M '
+                            f'--timeout=120 --connect-timeout=120 '
                             f'--max-download-limit=0 --max-overall-download-limit=0 '
                             f'--enable-http-pipelining=true --file-allocation=falloc" '
                             f'-o "{name}.pdf" "{url}"'
@@ -249,7 +251,8 @@ async def upload(bot: Client, m: Message):
                     res_file = await helper.download_video(url, cmd, name)
                     filename = res_file
                     await prog.delete(True)
-                    # Call fast_upload with only required parameters.
+                    # Call fast_upload with required parameter "file_location" removed;
+                    # use parameter "file" as expected by the function.
                     uploaded_file = await fast_upload(
                         client=bot,
                         file=filename,
