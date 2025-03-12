@@ -25,6 +25,11 @@ from pyrogram.errors.exceptions.bad_request_400 import StickerEmojiInvalid
 from pyrogram.types.messages_and_media import message
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
+# Store the x-access-token in a variable to avoid syntax issues.
+TOKEN = ("eyJhbGciOiJIUzM4NCIsInR5cCI6IkpXVCJ9."
+         "eyJpZCI6MzgzNjkyMTIsIm9yZ0lkIjoyNjA1LCJ0eXBlIjoxLCJtb2JpbGUiOiI5MTcwODI3NzQyODkiLCJuYW1lIjoiQWNlIiwiZW1haWwiOm51bGwsImlzRmlyc3RMb2dpbiI6dHJ1ZSwiZGVmYXVsdExhbmd1YWdlIjpudWxsLCJjb3VudHJ5Q29kZSI6IklOIiwiaXNJbnRlcm5hdGlvbmFsIjowLCJpYXQiOjE2NDMyODE4NzcsImV4cCI6MTY0Mzg4NjY3N30."
+         "hM33P2ai6ivdzxPPfm01LAd4JWv-vnrSxGXqvCirCSpUfhhofpeqyeHPxtstXwe0")
+
 # Import fast_upload from devgagantools.spylib.
 try:
     from devgagantools.spylib import fast_upload
@@ -38,9 +43,9 @@ bot = Client(
     bot_token=BOT_TOKEN
 )
 
-# Monkey-patch the client with a _get_dc method, if it doesn't exist.
+# (Optional) Monkey-patch _get_dc if needed.
 if not hasattr(bot, "_get_dc"):
-    bot._get_dc = lambda: bot.session.dc_id  # Returns the data center ID
+    bot._get_dc = lambda: bot.session.dc_id
 
 @bot.on_message(filters.command(["start"]))
 async def start(bot: Client, m: Message):
@@ -170,7 +175,7 @@ async def upload(bot: Client, m: Message):
             elif 'videos.classplusapp' in url:
                 api_url = "https://api.classplusapp.com/cams/uploader/video/jw-signed-url?url=" + url
                 url = requests.get(api_url, headers={
-                    'x-access-token': 'eyJhbGciOiJIUzM4NCIsInR5cCI6IkpXVCJ9.eyJpZCI6MzgzNjkyMTIsIm9yZ0lkIjoyNjA1LCJ0eXBlIjoxLCJtb2JpbGUiOiI5MTcwODI3NzQyODkiLCJuYW1lIjoiQWNlIiwiZW1haWwiOm51bGwsImlzRmlyc3RMb2dpbiI6dHJ1ZSwiZGVmYXVsdExhbmd1YWdlIjpudWxsLCJjb3VudHJ5Q29kZSI6IklOIiwiaXNJbnRlcm5hdGlvbmFsIjowLCJpYXQiOjE2NDMyODE4NzcsImV4cCI6MTY0Mzg4NjY3N30.hM33P2ai6ivdzxPPfm01LAd4JWv-vnrSxGXqvCirCSpUfhhofpeqyeHPxtstXwe0"
+                    'x-access-token': TOKEN
                 }).json()['url']
 
             elif '/master.mpd' in url:
@@ -250,7 +255,7 @@ async def upload(bot: Client, m: Message):
                     res_file = await helper.download_video(url, cmd, name)
                     filename = res_file
                     await prog.delete(True)
-                    # Open the downloaded file and pass it to fast_upload
+                    # Open the downloaded file in binary mode and pass it to fast_upload
                     with open(filename, "rb") as file_obj:
                         uploaded_file = await fast_upload(
                             client=bot,
