@@ -8,7 +8,8 @@ import subprocess
 import logging
 from telethon import TelegramClient, events
 import aiohttp
-from moviepy.editor import VideoFileClip  # added to extract video metadata
+from moviepy.editor import VideoFileClip  # to extract video metadata
+from telethon.tl.types import DocumentAttributeVideo  # for video attributes
 
 # Import configuration variables from your vars module
 from vars import API_ID, API_HASH, BOT_TOKEN
@@ -122,7 +123,6 @@ async def upload_handler(event):
         await bot.delete_messages(event.chat_id, [q6.id, caption_msg.id])
 
         # --- Step 7: Ask for thumbnail image ---
-        # Instead of asking for a URL, we ask the user to send a thumbnail image (as a Telegram file)
         q7 = await conv.send_message("Send a thumbnail image for this batch (or type 'no' to skip and let Telegram auto‑generate one):")
         thumb_msg = await conv.get_response()
         await bot.delete_messages(event.chat_id, [q7.id, thumb_msg.id])
@@ -132,8 +132,7 @@ async def upload_handler(event):
             thumb_path = None
             if thumb_msg.text.strip().lower() != "no":
                 thumb_path = None
-
-        # Store the thumbnail for the entire batch (if provided)
+        # Use this thumbnail for every upload in the batch
         batch_thumb = thumb_path
 
         status_msg = await conv.send_message("Processing your links...")
@@ -264,16 +263,20 @@ async def upload_handler(event):
                         uploaded_file = await fast_upload(bot, file_obj, progress_callback=progress_callback)
                     await bot.delete_messages(event.chat_id, progress_msg.id)
 
-                    # Send the uploaded file with correct metadata; if no thumbnail was provided, Telegram will generate one.
+                    # Set the filename on the uploaded file so Telegram recognizes it as MP4
+                    uploaded_file.name = f"{file_name}.mp4"
+
+                    # Create video attributes for proper metadata display
+                    attributes = [DocumentAttributeVideo(duration=duration, width=width, height=height, supports_streaming=True)]
+
+                    # Send the uploaded file with correct metadata. If no thumbnail was provided, Telegram will generate one.
                     await bot.send_file(
                         event.chat_id,
                         file=uploaded_file,
                         caption=cc,
                         supports_streaming=True,
-                        thumb=batch_thumb,
-                        duration=duration,
-                        width=width,
-                        height=height
+                        attributes=attributes,
+                        thumb=batch_thumb
                     )
                     await asyncio.sleep(1)
             except Exception as e:
@@ -282,7 +285,7 @@ async def upload_handler(event):
         await conv.send_message("**Done Boss 😎**")
         await bot.delete_messages(event.chat_id, status_msg.id)
         
-        # Delete the batch thumbnail file if it was provided
+        # If a thumbnail file was provided, delete it after the batch is done.
         if batch_thumb is not None and os.path.exists(batch_thumb):
             os.remove(batch_thumb)
 
