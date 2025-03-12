@@ -32,7 +32,8 @@ bot = Client(
     "bot",
     api_id=API_ID,
     api_hash=API_HASH,
-    bot_token=BOT_TOKEN)
+    bot_token=BOT_TOKEN
+)
 
 
 @bot.on_message(filters.command(["start"]))
@@ -41,7 +42,7 @@ async def start(bot: Client, m: Message):
 
 
 @bot.on_message(filters.command("stop"))
-async def restart_handler(_, m):
+async def restart_handler(_, m: Message):
     await m.reply_text("**Stopped**🚦", True)
     os.execl(sys.executable, sys.executable, *sys.argv)
 
@@ -56,17 +57,17 @@ async def upload(bot: Client, m: Message):
     path = f"./downloads/{m.chat.id}"
 
     try:
-       with open(x, "r") as f:
-           content = f.read()
-       content = content.split("\n")
-       links = []
-       for i in content:
-           links.append(i.split("://", 1))
-       os.remove(x)
+        with open(x, "r") as f:
+            content = f.read()
+        content = content.split("\n")
+        links = []
+        for i in content:
+            links.append(i.split("://", 1))
+        os.remove(x)
     except:
-           await m.reply_text("**Invalid file input.**")
-           os.remove(x)
-           return
+        await m.reply_text("**Invalid file input.**")
+        os.remove(x)
+        return
 
     await editable.edit("Are there any password-protected links in this file? If yes, please send the PW token. If not, type 'no'.")
     input_pw: Message = await bot.listen(editable.chat.id)
@@ -103,13 +104,13 @@ async def upload(bot: Client, m: Message):
         else: 
             res = "UN"
     except Exception:
-            res = "UN"
+        res = "UN"
     
     await editable.edit("Now Enter A Caption to add caption on your uploaded file")
     input3: Message = await bot.listen(editable.chat.id)
     raw_text3 = input3.text
     await input3.delete(True)
-    highlighter  = f"️ ⁪⁬⁮⁮⁮"
+    highlighter = f"️ ⁪⁬⁮⁮⁮"
     if raw_text3 == 'Robin':
         MR = highlighter 
     else:
@@ -135,7 +136,10 @@ async def upload(bot: Client, m: Message):
 
     try:
         for i in range(count - 1, len(links)):
-            V = links[i][1].replace("file/d/","uc?export=download&id=").replace("www.youtube-nocookie.com/embed", "youtu.be").replace("?modestbranding=1", "").replace("/view?usp=sharing","")
+            V = links[i][1].replace("file/d/", "uc?export=download&id=") \
+                           .replace("www.youtube-nocookie.com/embed", "youtu.be") \
+                           .replace("?modestbranding=1", "") \
+                           .replace("/view?usp=sharing", "")
             url = "https://" + V
 
             if "visionias" in url:
@@ -162,7 +166,9 @@ async def upload(bot: Client, m: Message):
             elif 'videos.classplusapp' in url:
                 url = requests.get(
                     f'https://api.classplusapp.com/cams/uploader/video/jw-signed-url?url={url}',
-                    headers={'x-access-token': 'eyJhbGciOiJIUzM4NCIsInR5cCI6IkpXVCJ9.eyJpZCI6MzgzNjkyMTIsIm9yZ0lkIjoyNjA1LCJ0eXBlIjoxLCJtb2JpbGUiOiI5MTcwODI3NzQyODkiLCJuYW1lIjoiQWNlIiwiZW1haWwiOm51bGwsImlzRmlyc3RMb2dpbiI6dHJ1ZSwiZGVmYXVsdExhbmd1YWdlIjpudWxsLCJjb3VudHJ5Q29kZSI6IklOIiwiaXNJbnRlcm5hdGlvbmFsIjowLCJpYXQiOjE2NDMyODE4NzcsImV4cCI6MTY0Mzg4NjY3N30.hM33P2ai6ivdzxPPfm01LAd4JWv-vnrSxGXqvCirCSpUfhhofpeqyeHPxtstXwe0'
+                    headers={
+                        'x-access-token': 'eyJhbGciOiJIUzM4NCIsInR5cCI6IkpXVCJ9.eyJpZCI6MzgzNjkyMTIsIm9yZ0lkIjoyNjA1LCJ0eXBlIjoxLCJtb2JpbGUiOiI5MTcwODI3NzQyODkiLCJuYW1lIjoiQWNlIiwiZW1haWwiOm51bGwsImlzRmlyc3RMb2dpbiI6dHJ1ZSwiZGVmYXVsdExhbmd1YWdlIjpudWxsLCJjb3VudHJ5Q29kZSI6IklOIiwiaXNJbnRlcm5hdGlvbmFsIjowLCJpYXQiOjE2NDMyODE4NzcsImV4cCI6MTY0Mzg4NjY3N30.hM33P2ai6ivdzxPPfm01LAd4JWv-vnrSxGXqvCirCSpUfhhofpeqyeHPxtstXwe0'
+                    }
                 ).json()['url']
 
             elif '/master.mpd' in url:
@@ -188,9 +194,21 @@ async def upload(bot: Client, m: Message):
                 ytf = f"b[height<={raw_text2}]/bv[height<={raw_text2}]+ba/b/bv+ba"
 
             if "jw-prod" in url:
-                cmd = f'yt-dlp --external-downloader aria2c --external-downloader-args "-x 16 -s 16 -k 1M --max-download-limit=0 --max-overall-download-limit=0 --enable-http-pipelining=true --file-allocation=falloc" -o "{name}.mp4" "{url}"'
+                cmd = (
+                    f'yt-dlp --external-downloader aria2c '
+                    f'--external-downloader-args "-x 16 -s 16 -k 1M '
+                    f'--max-download-limit=0 --max-overall-download-limit=0 '
+                    f'--enable-http-pipelining=true --file-allocation=falloc" '
+                    f'-o "{name}.mp4" "{url}"'
+                )
             else:
-                cmd = f'yt-dlp --external-downloader aria2c --external-downloader-args "-x 16 -s 16 -k 1M --max-download-limit=0 --max-overall-download-limit=0 --enable-http-pipelining=true --file-allocation=falloc" -f "{ytf}" "{url}" -o "{name}.mp4"'
+                cmd = (
+                    f'yt-dlp --external-downloader aria2c '
+                    f'--external-downloader-args "-x 16 -s 16 -k 1M '
+                    f'--max-download-limit=0 --max-overall-download-limit=0 '
+                    f'--enable-http-pipelining=true --file-allocation=falloc" '
+                    f'-f "{ytf}" "{url}" -o "{name}.mp4"'
+                )
 
             try:
                 cc = f'**{str(count).zfill(3)}**. {name1}{MR}.mkv\n**Batch Name »** {raw_text0}\n**Downloaded By :** TechMon ❤️‍🔥 @TechMonX'
@@ -208,7 +226,13 @@ async def upload(bot: Client, m: Message):
                         continue
                 elif ".pdf" in url:
                     try:
-                        cmd = f'yt-dlp --external-downloader aria2c --external-downloader-args "-x 16 -s 16 -k 1M --max-download-limit=0 --max-overall-download-limit=0 --enable-http-pipelining=true --file-allocation=falloc" -o "{name}.pdf" "{url}"'
+                        cmd = (
+                            f'yt-dlp --external-downloader aria2c '
+                            f'--external-downloader-args "-x 16 -s 16 -k 1M '
+                            f'--max-download-limit=0 --max-overall-download-limit=0 '
+                            f'--enable-http-pipelining=true --file-allocation=falloc" '
+                            f'-o "{name}.pdf" "{url}"'
+                        )
                         download_cmd = f"{cmd} -R 25 --fragment-retries 25"
                         os.system(download_cmd)
                         copy = await bot.send_document(chat_id=m.chat.id, document=f'{name}.pdf', caption=cc1)
@@ -225,7 +249,6 @@ async def upload(bot: Client, m: Message):
                     res_file = await helper.download_video(url, cmd, name)
                     filename = res_file
                     await prog.delete(True)
-                    # Use fast uploader from devgagantools (imported as fast_upload)
                     await fast_upload(bot, m.chat.id, filename, caption=cc, thumb=thumb)
                     count += 1
                     await asyncio.sleep(1)
