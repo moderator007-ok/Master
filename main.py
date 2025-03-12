@@ -25,12 +25,10 @@ from pyrogram.errors.exceptions.bad_request_400 import StickerEmojiInvalid
 from pyrogram.types.messages_and_media import message
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-# Import the fast_upload function from devgagantools.spylib.
-# Based on the repository README, the function should accept 'filepath' (not file_location)
+# Import fast_upload functionality from devgagantools.spylib.
 try:
     from devgagantools.spylib import fast_upload
 except ImportError:
-    # Fallback: if the function is named differently, adjust here
     from devgagantools.spylib import upload_file as fast_upload
 
 bot = Client(
@@ -82,7 +80,9 @@ async def upload(bot: Client, m: Message):
     pw_token = input_pw.text.strip()
     await input_pw.delete(True)
     
-    await editable.edit(f"**𝕋ᴏᴛᴀʟ ʟɪɴᴋ𝕤 ғᴏᴜɴᴅ ᴀʀᴇ🔗🔗** **{len(links)}**\n\n**𝕊ᴇɴᴅ 𝔽ʀᴏᴍ ᴡʜᴇʀᴇ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ ᴅᴏᴡɴʟᴏᴀᴅ ɪɴɪᴛɪᴀʟ ɪ𝕤** **1**")
+    await editable.edit(
+        f"**𝕋ᴏᴛᴀʟ ʟɪɴᴋ𝕤 ғᴏᴜɴᴅ ᴀʀᴇ🔗🔗** **{len(links)}**\n\n**𝕊ᴇɴᴅ 𝔽ʀᴏᴍ ᴡʜᴇʀᴇ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ ᴅᴏᴡɴʟᴏᴀᴅ ɪɴɪᴛɪᴀʟ ɪ𝕤** **1**"
+    )
     input0: Message = await bot.listen(editable.chat.id)
     raw_text = input0.text
     await input0.delete(True)
@@ -124,7 +124,9 @@ async def upload(bot: Client, m: Message):
     else:
         MR = raw_text3
        
-    await editable.edit("Now send the Thumb url/nEg » https://graph.org/file/ce1723991756e48c35aa1.jpg \n Or if don't want thumbnail send = no")
+    await editable.edit(
+        "Now send the Thumb url/nEg » https://graph.org/file/ce1723991756e48c35aa1.jpg \n Or if don't want thumbnail send = no"
+    )
     input6 = message = await bot.listen(editable.chat.id)
     raw_text6 = input6.text
     await input6.delete(True)
@@ -258,10 +260,10 @@ async def upload(bot: Client, m: Message):
                     res_file = await helper.download_video(url, cmd, name)
                     filename = res_file
                     await prog.delete(True)
-                    # Use fast_upload with updated parameter name "filepath"
+                    # Use fast_upload with parameter file_location as expected by the tool
                     uploaded_file = await fast_upload(
                         client=bot,
-                        filepath=filename,
+                        file_location=filename,
                         reply=m,
                         name=name,
                         user_id=m.chat.id
