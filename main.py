@@ -8,6 +8,7 @@ import subprocess
 import logging
 from telethon import TelegramClient, events
 import aiohttp
+from moviepy.editor import VideoFileClip  # added to extract video metadata
 
 # Import configuration variables from your vars module
 from vars import API_ID, API_HASH, BOT_TOKEN
@@ -124,16 +125,12 @@ async def upload_handler(event):
         # Instead of asking for a URL, we ask the user to send a thumbnail image (as a Telegram file)
         q7 = await conv.send_message("Send a thumbnail image for this batch (or type 'no' to skip and let Telegram auto‑generate one):")
         thumb_msg = await conv.get_response()
-        # Delete the prompt and the reply
         await bot.delete_messages(event.chat_id, [q7.id, thumb_msg.id])
         if thumb_msg.media:
-            # Download the thumbnail file from Telegram
             thumb_path = await bot.download_media(thumb_msg)
         else:
-            # If user types text and it is "no", then we set thumb to None
             thumb_path = None
             if thumb_msg.text.strip().lower() != "no":
-                # In case of invalid input, treat as no thumbnail
                 thumb_path = None
 
         # Store the thumbnail for the entire batch (if provided)
@@ -234,6 +231,12 @@ async def upload_handler(event):
                     res_file = await helper.download_video(url, cmd, file_name)
                     await bot.delete_messages(event.chat_id, dl_msg.id)
 
+                    # --- Extract video metadata using MoviePy ---
+                    clip = VideoFileClip(res_file)
+                    duration = int(clip.duration)
+                    width, height = clip.size
+                    clip.close()
+
                     # --- UPLOAD WITH PROGRESS (update every ~5%) ---
                     progress_msg = await conv.send_message("Uploading file... 0%")
                     last_percent = 0
@@ -261,14 +264,16 @@ async def upload_handler(event):
                         uploaded_file = await fast_upload(bot, file_obj, progress_callback=progress_callback)
                     await bot.delete_messages(event.chat_id, progress_msg.id)
 
-                    # Use the manually provided thumbnail for every upload if available;
-                    # otherwise, let Telegram generate its own thumbnail.
+                    # Send the uploaded file with correct metadata; if no thumbnail was provided, Telegram will generate one.
                     await bot.send_file(
                         event.chat_id,
                         file=uploaded_file,
                         caption=cc,
                         supports_streaming=True,
-                        thumb=batch_thumb
+                        thumb=batch_thumb,
+                        duration=duration,
+                        width=width,
+                        height=height
                     )
                     await asyncio.sleep(1)
             except Exception as e:
@@ -277,7 +282,7 @@ async def upload_handler(event):
         await conv.send_message("**Done Boss 😎**")
         await bot.delete_messages(event.chat_id, status_msg.id)
         
-        # If a thumbnail file was provided, delete it after the batch is done.
+        # Delete the batch thumbnail file if it was provided
         if batch_thumb is not None and os.path.exists(batch_thumb):
             os.remove(batch_thumb)
 
