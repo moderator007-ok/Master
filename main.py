@@ -391,7 +391,7 @@ async def telethon_send_video(event, file_path, caption, thumb=None, progress_ca
     clip.close()
 
     # Create video attributes for proper metadata display
-    attributes = [DocumentAttributeVideo(duration=duration_sec, width=width, height=height, supports_streaming=True)]
+    attributes = [DocumentAttributeVideo(duration=duration_sec, w=width, h=height, supports_streaming=True)]
 
     message = await bot.send_file(
         event.chat_id,
