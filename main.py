@@ -8,8 +8,8 @@ import subprocess
 import logging
 import aiohttp
 from pyrogram import Client, filters
-from pyromod import listen  # provides an easy "conversation" interface
-from pyrogram.connection.connection_tcp_full import ConnectionTcpFull  # Correct import for MTProto TCP Full
+from pyromod import listen  # Provides an easy conversation interface
+from pyrogram.connection import ConnectionTcpFull  # Use MTProto TCP for faster uploads
 
 # Import configuration variables from your vars module
 from vars import API_ID, API_HASH, BOT_TOKEN
@@ -19,7 +19,7 @@ import core as helper  # Assumes helper.download_video() and helper.download() e
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("pyrogram")
 
-# Initialize the Pyrogram client with TCP Full connection
+# Initialize the Pyrogram client with a TCP Full connection
 app = Client(
     "bot",
     api_id=API_ID,
@@ -128,7 +128,7 @@ async def upload_handler(client, message):
     caption = highlighter if caption_input == 'Robin' else caption_input
     await client.delete_messages(chat_id, [q6.id, caption_msg.id])
 
-    # --- Skip Thumbnail Step ---
+    # --- Processing Links ---
     status_msg = await message.reply("Processing your links...")
 
     for i in range(count - 1, len(links)):
@@ -225,7 +225,7 @@ async def upload_handler(client, message):
                 res_file = await helper.download_video(url, cmd, file_name)
                 await client.delete_messages(chat_id, dl_msg.id)
 
-                # --- Upload Video with 5% Progress Updates ---
+                # Upload video with progress updates every 5%
                 progress_msg = await message.reply("Uploading file... 0%")
                 last_percent = 0
 
