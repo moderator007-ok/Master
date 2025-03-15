@@ -36,6 +36,101 @@ def human_readable(size, decimal_places=2):
         size /= 1024
     return f"{size:.{decimal_places}f}PB"
 
+
+# --------------------------------------------------
+# Don't Remove Credit Tg - @VJ_Botz
+# Subscribe YouTube Channel For Amazing Bot https://youtube.com/@Tech_VJ
+# Ask Doubt on telegram @KingVJ01
+
+import math
+from pyrogram.errors import FloodWait
+from datetime import datetime, timedelta
+
+class Timer:
+    def __init__(self, time_between=5):
+        self.start_time = time.time()
+        self.time_between = time_between
+
+    def can_send(self):
+        if time.time() > (self.start_time + self.time_between):
+            self.start_time = time.time()
+            return True
+        return False
+
+def hrb(value, digits=2, delim="", postfix=""):
+    """Return a human-readable file size."""
+    if value is None:
+        return None
+    chosen_unit = "B"
+    for unit in ("KiB", "MiB", "GiB", "TiB"):
+        if value > 1000:
+            value /= 1024
+            chosen_unit = unit
+        else:
+            break
+    return f"{value:.{digits}f}" + delim + chosen_unit + postfix
+
+def hrt(seconds, precision=0):
+    """Return a human-readable time delta as a string."""
+    pieces = []
+    value = timedelta(seconds=seconds)
+    if value.days:
+        pieces.append(f"{value.days}d")
+    seconds = value.seconds
+    if seconds >= 3600:
+        hours = int(seconds / 3600)
+        pieces.append(f"{hours}h")
+        seconds -= hours * 3600
+    if seconds >= 60:
+        minutes = int(seconds / 60)
+        pieces.append(f"{minutes}m")
+        seconds -= minutes * 60
+    if seconds > 0 or not pieces:
+        pieces.append(f"{seconds}s")
+    if not precision:
+        return "".join(pieces)
+    return "".join(pieces[:precision])
+
+timer = Timer()
+
+async def progress_bar(current, total, reply, start):
+    if timer.can_send():
+        now = time.time()
+        diff = now - start
+        if diff < 1:
+            return
+        else:
+            perc = f"{current * 100 / total:.1f}%"
+            elapsed_time = round(diff)
+            speed = current / elapsed_time
+            remaining_bytes = total - current
+            if speed > 0:
+                eta_seconds = remaining_bytes / speed
+                eta = hrt(eta_seconds, precision=1)
+            else:
+                eta = "-"
+            sp = str(hrb(speed)) + "/s"
+            tot = hrb(total)
+            cur = hrb(current)
+            bar_length = 11
+            completed_length = int(current * bar_length / total)
+            remaining_length = bar_length - completed_length
+            progress_str = "▰" * completed_length + "▱" * remaining_length
+            
+            try:
+                await reply.edit(
+                    f'<b>\n ╭──⌯════🆄︎ᴘʟᴏᴀᴅɪɴɢ⬆️⬆️═════⌯──╮ \n'
+                    f'├⚡ {progress_str}|﹝{perc}﹞ \n'
+                    f'├🚀 Speed » {sp} \n'
+                    f'├📟 Processed » {cur}\n'
+                    f'├🧲 Size - ETA » {tot} - {eta} \n'
+                    f'├🤖 By » TechMon\n'
+                    f'╰─═══ ✪ TechMon ✪ ═══─╯\n</b>'
+                )
+            except FloodWait as e:
+                time.sleep(e.x)
+# --------------------------------------------------
+
 @bot.on(events.NewMessage(pattern=r'^/start'))
 async def start_handler(event):
     msg = await event.reply(
@@ -74,7 +169,7 @@ async def upload_handler(event):
             return
 
         # --- Step 2: Ask for password token ---
-        q2 = await conv.send_message("Are there any password-protected links in this file? If yes, send the PW token. If not, type 'no'.")
+        q2 = await conv.send_message("Are there any password‑protected links in this file? If yes, send the PW token. If not, type 'no'.")
         pw_msg = await conv.get_response()
         pw_token = pw_msg.text.strip()
         await bot.delete_messages(event.chat_id, [q2.id, pw_msg.id])
@@ -161,11 +256,13 @@ async def upload_handler(event):
                 api_url = "https://api.classplusapp.com/cams/uploader/video/jw-signed-url?url=" + url
                 url = requests.get(api_url, headers={'x-access-token': 'TOKEN'}).json()['url']
             elif '/master.mpd' in url:
-                if "d1d34p8vz63oiq" in url or "sec1.pw.live" in url:
-                    url = f"https://anonymouspwplayer-b99f57957198.herokuapp.com/pw?url={url}?token={pw_token}"
-                else:
-                    id_part = url.split("/")[-2]
-                    url = "https://d26g5bnklkwsh4.cloudfront.net/" + id_part + "/master.m3u8"
+                # Extract the unique ID from the URL.
+                # Assumes the URL format is: https://<domain>/<unique_id>/master.mpd
+                parts = url.split("/")
+                unique_id = parts[3] if len(parts) >= 5 else None
+                if not unique_id:
+                    unique_id = "350b02d7-2abf-4643-b88f-4ba7811feacd"  # fallback
+                url = f"https://madxapi-d0cbf6ac738c.herokuapp.com/{unique_id}/master.m3u8?token={pw_token}"
 
             name1 = links[i][0].replace("\t", "").replace(":", "").replace("/", "") \
                                .replace("+", "").replace("#", "").replace("|", "") \
@@ -200,8 +297,8 @@ async def upload_handler(event):
                     try:
                         ka = await helper.download(url, file_name)
                         await conv.send_message("Uploading document...")
-                        await bot.send_file(event.chat_id, file=ka, caption=cc1)
-                        os.remove(ka)
+                        # Use Telethon-based document upload function
+                        await telethon_send_doc(event, ka, cc1)
                         await asyncio.sleep(1)
                     except Exception as e:
                         await conv.send_message(str(e))
@@ -218,66 +315,36 @@ async def upload_handler(event):
                         )
                         download_cmd = f"{cmd_pdf} -R 25 --fragment-retries 25"
                         os.system(download_cmd)
-                        await bot.send_file(event.chat_id, file=f'{file_name}.pdf', caption=cc1)
-                        os.remove(f'{file_name}.pdf')
+                        # Use Telethon-based document upload function
+                        await telethon_send_doc(event, f'{file_name}.pdf', cc1)
                         await asyncio.sleep(1)
                     except Exception as e:
                         await conv.send_message(str(e))
                         await asyncio.sleep(5)
                         continue
                 else:
-                    dl_msg = await conv.send_message(f"**⥥ DOWNLOADING... »**\n\n**Name »** `{file_name}`\n**Quality »** {raw_res}\n\n**URL »** `{url}`")
+                    dl_msg = await conv.send_message(
+                        f"**⥥ DOWNLOADING... »**\n\n**Name »** `{file_name}`\n**Quality »** {raw_res}\n\n**URL »** `{url}`"
+                    )
                     res_file = await helper.download_video(url, cmd, file_name)
                     await bot.delete_messages(event.chat_id, dl_msg.id)
 
                     # --- Extract video metadata using MoviePy ---
                     clip = VideoFileClip(res_file)
-                    duration = int(clip.duration)
+                    duration_sec = int(clip.duration)
                     width, height = clip.size
                     clip.close()
 
-                    # --- UPLOAD WITH PROGRESS (update every ~5%) ---
-                    progress_msg = await conv.send_message("Uploading file... 0%")
-                    last_percent = 0
-                    last_time = time.time()
-                    last_bytes = 0
+                    # Create a progress message and record the start time
+                    progress_message = await conv.send_message("Uploading file... 0%")
+                    start_time = time.time()
 
-                    async def progress_callback(current, total):
-                        nonlocal last_percent, last_time, last_bytes
-                        percent = (current / total) * 100
-                        if percent - last_percent >= 5 or current == total:
-                            now = time.time()
-                            dt = now - last_time
-                            speed = (current - last_bytes) / dt if dt > 0 else 0
-                            speed_str = human_readable(speed) + "/s"
-                            text = f"Uploading: {percent:.2f}% ({human_readable(current)}/{human_readable(total)}) at {speed_str}"
-                            try:
-                                await bot.edit_message(event.chat_id, progress_msg.id, text)
-                            except Exception as ex:
-                                log.error(f"Progress update failed: {ex}")
-                            last_percent = percent
-                            last_time = now
-                            last_bytes = current
+                    # Define a wrapper callback that calls our progress_bar function
+                    async def progress_callback_wrapper(current, total):
+                        await progress_bar(current, total, progress_message, start_time)
 
-                    with open(res_file, "rb") as file_obj:
-                        uploaded_file = await fast_upload(bot, file_obj, progress_callback=progress_callback)
-                    await bot.delete_messages(event.chat_id, progress_msg.id)
-
-                    # Set the filename on the uploaded file so Telegram recognizes it as MP4
-                    uploaded_file.name = f"{file_name}.mp4"
-
-                    # Create video attributes for proper metadata display
-                    attributes = [DocumentAttributeVideo(duration=duration, width=width, height=height, supports_streaming=True)]
-
-                    # Send the uploaded file with correct metadata. If no thumbnail was provided, Telegram will generate one.
-                    await bot.send_file(
-                        event.chat_id,
-                        file=uploaded_file,
-                        caption=cc,
-                        supports_streaming=True,
-                        attributes=attributes,
-                        thumb=batch_thumb
-                    )
+                    # Use Telethon-based video upload function with our progress callback
+                    await telethon_send_video(event, res_file, cc, thumb=batch_thumb, progress_callback=progress_callback_wrapper)
                     await asyncio.sleep(1)
             except Exception as e:
                 await conv.send_message(f"**Downloading Interrupted**\n{str(e)}\n**Name »** {file_name}\n**URL »** `{url}`")
@@ -288,6 +355,59 @@ async def upload_handler(event):
         # If a thumbnail file was provided, delete it after the batch is done.
         if batch_thumb is not None and os.path.exists(batch_thumb):
             os.remove(batch_thumb)
+
+# --- Telethon-based Uploading Functions ---
+
+async def telethon_send_doc(event, file_path, caption, progress_callback=None):
+    """
+    Upload a document using Telethon's send_file.
+    """
+    message = await bot.send_file(
+        event.chat_id,
+        file=file_path,
+        caption=caption,
+        progress_callback=progress_callback
+    )
+    if os.path.exists(file_path):
+        os.remove(file_path)
+    return message
+
+async def telethon_send_video(event, file_path, caption, thumb=None, progress_callback=None):
+    """
+    Upload a video using Telethon's send_file with streaming support.
+    If no thumbnail is provided, generate one using ffmpeg.
+    """
+    # If no thumbnail provided, generate one from the video
+    if not thumb or thumb.lower() == "no":
+        thumb_path = f"{file_path}.jpg"
+        subprocess.run(f'ffmpeg -i "{file_path}" -ss 00:00:12 -vframes 1 "{thumb_path}"', shell=True)
+    else:
+        thumb_path = thumb
+
+    # Extract video metadata using MoviePy
+    clip = VideoFileClip(file_path)
+    duration_sec = int(clip.duration)
+    width, height = clip.size
+    clip.close()
+
+    # Create video attributes for proper metadata display
+    attributes = [DocumentAttributeVideo(duration=duration_sec, width=width, height=height, supports_streaming=True)]
+
+    message = await bot.send_file(
+        event.chat_id,
+        file=file_path,
+        caption=caption,
+        supports_streaming=True,
+        thumb=thumb_path,
+        progress_callback=progress_callback,
+        attributes=attributes
+    )
+    if os.path.exists(file_path):
+        os.remove(file_path)
+    # Remove generated thumbnail if it was auto‑created
+    if (not thumb or thumb.lower() == "no") and os.path.exists(thumb_path):
+        os.remove(thumb_path)
+    return message
 
 def main():
     print("Bot is running...")
