@@ -94,11 +94,13 @@ async def upload_handler(event):
             return
 
         # Step 2: Ask for PW token
-        q2 = await conv.send_message("Are there any password-protected links in this file? If yes, send the PW token. If not, type 'no'.")
+        q2 = await conv.send_message(
+            "Are there any password-protected links in this file? If yes, send the PW token. If not, type 'no'."
+        )
         pw_msg = await conv.get_response()
         pw_token = pw_msg.text.strip()
         await bot.delete_messages(event.chat_id, [q2.id, pw_msg.id])
-        
+
         # Step 3: Ask for starting link index
         q3 = await conv.send_message(
             f"**Total links found:** **{len(links)}**\n\nSend a number indicating from which link you want to start downloading (e.g. 1)."
