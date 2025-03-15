@@ -97,7 +97,9 @@ async def upload_handler(event):
         await bot.delete_messages(event.chat_id, [q2.id, pw_msg.id])
         
         # --- Step 3: Ask for starting link index ---
-        q3 = await conv.send_message(f"**Total links found:** **{len(links)}**\n\nSend a number indicating from which link you want to start downloading (e.g. 1).")
+        q3 = await conv.send_message(
+            f"**Total links found:** **{len(links)}**\n\nSend a number indicating from which link you want to start downloading (e.g. 1)."
+        )
         start_msg = await conv.get_response()
         try:
             start_index = int(start_msg.text.strip())
@@ -140,7 +142,9 @@ async def upload_handler(event):
         await bot.delete_messages(event.chat_id, [q6.id, caption_msg.id])
 
         # --- Step 7: Ask for thumbnail image ---
-        q7 = await conv.send_message("Send a thumbnail image for this batch (or type 'no' to skip and let Telegram auto‑generate one):")
+        q7 = await conv.send_message(
+            "Send a thumbnail image for this batch (or type 'no' to skip and let Telegram auto‑generate one):"
+        )
         thumb_msg = await conv.get_response()
         await bot.delete_messages(event.chat_id, [q7.id, thumb_msg.id])
         if thumb_msg.media:
@@ -175,7 +179,6 @@ async def upload_handler(event):
                 api_url = "https://api.classplusapp.com/cams/uploader/video/jw-signed-url?url=" + url
                 url = requests.get(api_url, headers={'x-access-token': 'TOKEN'}).json()['url']
             elif '/master.mpd' in url:
-                # If the URL is from cloudfront, extract the madxapi id from the URL
                 if "d1d34p8vz63oiq.cloudfront.net" in url:
                     parts = url.split("/")
                     extracted_id = parts[3] if len(parts) > 3 else None
@@ -206,7 +209,7 @@ async def upload_handler(event):
             else:
                 cmd = f'yt-dlp -f "{ytf}" "{url}" -o "{file_name}.mp4"'
 
-            try:  
+            try:
                 cc = f'**[📽️] Vid_ID:** {str(i+1).zfill(3)}. {name1}{caption}.mkv\n**Batch Name »** {batch_name}\n**Downloaded By :** TechMon ❤️‍🔥 @TechMonX'
                 cc1 = f'**[📁] Pdf_ID:** {str(i+1).zfill(3)}. {name1}{caption}.pdf\n**Batch Name »** {batch_name}\n**Downloaded By :** TechMon ❤️‍🔥 @TechMonX'
                 if "drive" in url:
