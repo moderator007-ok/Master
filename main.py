@@ -79,6 +79,34 @@ def format_eta(seconds):
     """Format seconds as HH:MM:SS."""
     return time.strftime("%H:%M:%S", time.gmtime(seconds))
 
+def generate_thumbnail(video_file, thumbnail_path, time_offset="00:00:01.000"):
+    """
+    Generate a thumbnail image from a video file using FFmpeg.
+
+    Args:
+        video_file (str): Path to the source video file.
+        thumbnail_path (str): Path where the thumbnail image will be saved.
+        time_offset (str): Timestamp offset (HH:MM:SS.mmm) to capture the thumbnail.
+
+    Returns:
+        str or None: Returns the thumbnail path if successful, otherwise None.
+    """
+    ffmpeg_executable = "ffmpeg"  # Change to absolute path if necessary (e.g., '/usr/bin/ffmpeg')
+    command = [
+        ffmpeg_executable,
+        "-i", video_file,
+        "-ss", time_offset,
+        "-vframes", "1",
+        thumbnail_path,
+        "-y"  # Overwrite output file if it exists
+    ]
+    try:
+        subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        return thumbnail_path
+    except subprocess.CalledProcessError as e:
+        log.error(f"Thumbnail generation failed: {e}")
+        return None
+
 # =============================================================================
 #                           TELEGRAM BOT HANDLERS
 # =============================================================================
@@ -219,6 +247,7 @@ async def upload_handler(event):
             thumb_path = None
             if thumb_msg.text.strip().lower() != "no":
                 thumb_path = None
+        # 'batch_thumb' will be used for all files if provided; otherwise we generate one per file
         batch_thumb = thumb_path
 
         # -------------------------------------------------------------------
@@ -377,6 +406,16 @@ async def upload_handler(event):
                     duration = int(clip.duration)
                     width, height = clip.size
                     clip.close()
+                    
+                    # ----------------------------------------------------------------
+                    # If no thumbnail was provided, generate one for this video using FFmpeg
+                    # ----------------------------------------------------------------
+                    if batch_thumb is None:
+                        thumb_file = f"{file_name}_thumb.jpg"
+                        generated_thumb = generate_thumbnail(res_file, thumb_file)
+                        current_thumb = generated_thumb
+                    else:
+                        current_thumb = batch_thumb
 
                     # ----------------------------------------------------------------
                     # UPLOAD WITH PROGRESS CALLBACK using custom progress bar
@@ -444,7 +483,7 @@ async def upload_handler(event):
                         caption=cc,
                         supports_streaming=True,
                         attributes=attributes,
-                        thumb=batch_thumb
+                        thumb=current_thumb
                     )
                     await asyncio.sleep(1)
 
@@ -464,7 +503,7 @@ async def upload_handler(event):
         await bot.delete_messages(event.chat_id, status_msg.id)
 
         # -------------------------------------------------------------------
-        # Clean up: Remove thumbnail file if provided
+        # Clean up: Remove thumbnail file if provided/generated
         # -------------------------------------------------------------------
         if batch_thumb is not None and os.path.exists(batch_thumb):
             os.remove(batch_thumb)
