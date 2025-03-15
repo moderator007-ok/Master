@@ -72,7 +72,7 @@ async def stop_handler(event):
 @bot.on(events.NewMessage(pattern=r'^/upload'))
 async def upload_handler(event):
     async with bot.conversation(event.chat_id) as conv:
-        # --- Step 1: Ask for TXT file ---
+        # Step 1: Ask for TXT file
         q1 = await conv.send_message("Send TXT file ⚡️")
         txt_msg = await conv.get_response()
         await bot.delete_messages(event.chat_id, [q1.id, txt_msg.id])
@@ -90,13 +90,13 @@ async def upload_handler(event):
             os.remove(txt_path)
             return
 
-        # --- Step 2: Ask for PW token ---
+        # Step 2: Ask for PW token
         q2 = await conv.send_message("Are there any password-protected links in this file? If yes, send the PW token. If not, type 'no'.")
         pw_msg = await conv.get_response()
         pw_token = pw_msg.text.strip()
         await bot.delete_messages(event.chat_id, [q2.id, pw_msg.id])
-        
-        # --- Step 3: Ask for starting link index ---
+
+        # Step 3: Ask for starting link index
         q3 = await conv.send_message(
             f"**Total links found:** **{len(links)}**\n\nSend a number indicating from which link you want to start downloading (e.g. 1)."
         )
@@ -107,13 +107,13 @@ async def upload_handler(event):
             start_index = 1
         await bot.delete_messages(event.chat_id, [q3.id, start_msg.id])
 
-        # --- Step 4: Ask for batch name ---
+        # Step 4: Ask for batch name
         q4 = await conv.send_message("Now send me your batch name:")
         batch_msg = await conv.get_response()
         batch_name = batch_msg.text.strip()
         await bot.delete_messages(event.chat_id, [q4.id, batch_msg.id])
 
-        # --- Step 5: Ask for resolution ---
+        # Step 5: Ask for resolution
         q5 = await conv.send_message("Enter resolution (choose: 144, 240, 360, 480, 720, 1080):")
         res_msg = await conv.get_response()
         raw_res = res_msg.text.strip()
@@ -133,7 +133,7 @@ async def upload_handler(event):
         else:
             res = "UN"
 
-        # --- Step 6: Ask for caption ---
+        # Step 6: Ask for caption
         q6 = await conv.send_message("Now enter a caption for your uploaded file:")
         caption_msg = await conv.get_response()
         caption_input = caption_msg.text.strip()
@@ -141,10 +141,8 @@ async def upload_handler(event):
         caption = highlighter if caption_input == 'Robin' else caption_input
         await bot.delete_messages(event.chat_id, [q6.id, caption_msg.id])
 
-        # --- Step 7: Ask for thumbnail image ---
-        q7 = await conv.send_message(
-            "Send a thumbnail image for this batch (or type 'no' to skip and let Telegram auto‑generate one):"
-        )
+        # Step 7: Ask for thumbnail image
+        q7 = await conv.send_message("Send a thumbnail image for this batch (or type 'no' to skip and let Telegram auto‑generate one):")
         thumb_msg = await conv.get_response()
         await bot.delete_messages(event.chat_id, [q7.id, thumb_msg.id])
         if thumb_msg.media:
@@ -154,7 +152,7 @@ async def upload_handler(event):
 
         status_msg = await conv.send_message("Processing your links...")
 
-        # --- Process each link ---
+        # Process each link
         counter = start_index
         for i in range(start_index - 1, len(links)):
             # Reconstruct URL
@@ -243,14 +241,14 @@ async def upload_handler(event):
                     res_file = await helper.download_video(url, cmd, file_name)
                     await bot.delete_messages(event.chat_id, prog.id)
                     
-                    # --- Extract video metadata using MoviePy ---
+                    # Extract video metadata using MoviePy
                     duration, width, height = get_video_metadata(res_file)
                     
-                    # --- Generate thumbnail if none provided ---
+                    # Generate thumbnail if none provided
                     if batch_thumb is None:
                         batch_thumb = generate_thumbnail(res_file)
                     
-                    # --- UPLOAD WITH PROGRESS (update every ~5%) ---
+                    # UPLOAD WITH PROGRESS (update every ~5%)
                     progress_msg = await conv.send_message("Uploading file... 0%")
                     last_percent = 0
                     last_time = time.time()
@@ -294,7 +292,9 @@ async def upload_handler(event):
                     counter += 1
                     await asyncio.sleep(1)
             except Exception as e:
-                await conv.send_message(f"**Downloading Interrupted**\n{str(e)}\n**Name »** {file_name}\n**URL »** `{url}`")
+                await conv.send_message(
+                    f"**Downloading Interrupted**\n{str(e)}\n**Name »** {file_name}\n**URL »** `{url}`"
+                )
                 continue
     except Exception as e:
         await conv.send_message(str(e))
