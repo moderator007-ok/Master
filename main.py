@@ -122,18 +122,8 @@ async def upload_handler(event):
         caption = highlighter if caption_input == 'Robin' else caption_input
         await bot.delete_messages(event.chat_id, [q6.id, caption_msg.id])
 
-        # --- Step 7: Ask for thumbnail image ---
-        q7 = await conv.send_message("Send a thumbnail image for this batch (or type 'no' to skip and let Telegram auto‑generate one):")
-        thumb_msg = await conv.get_response()
-        await bot.delete_messages(event.chat_id, [q7.id, thumb_msg.id])
-        if thumb_msg.media:
-            thumb_path = await bot.download_media(thumb_msg)
-        else:
-            thumb_path = None
-            if thumb_msg.text.strip().lower() != "no":
-                thumb_path = None
-        batch_thumb = thumb_path
-
+        # --- Skip Thumbnail Step ---
+        # We always let Telegram autogenerate the thumbnail.
         status_msg = await conv.send_message("Processing your links...")
 
         # --- Process each link ---
@@ -265,17 +255,17 @@ async def upload_handler(event):
                     # Set the filename on the uploaded file so Telegram recognizes it as MP4
                     uploaded_file.name = f"{file_name}.mp4"
 
-                    # Create video attributes using 'w' and 'h' instead of width/height
+                    # Create video attributes with metadata
                     attributes = [DocumentAttributeVideo(duration=duration, w=width, h=height, supports_streaming=True)]
 
-                    # Send the uploaded file with correct metadata. If no thumbnail was provided, Telegram will generate one.
+                    # Send the uploaded file with correct metadata.
+                    # Note: We are not providing a thumbnail, so Telegram will autogenerate one.
                     await bot.send_file(
                         event.chat_id,
                         file=uploaded_file,
                         caption=cc,
                         supports_streaming=True,
-                        attributes=attributes,
-                        thumb=batch_thumb
+                        attributes=attributes
                     )
                     await asyncio.sleep(1)
             except Exception as e:
@@ -284,7 +274,7 @@ async def upload_handler(event):
         await conv.send_message("**Done Boss 😎**")
         await bot.delete_messages(event.chat_id, status_msg.id)
         
-        # If a thumbnail file was provided, delete it after the batch is done.
+        # If a thumbnail file was provided (which we now ignore), delete it.
         if batch_thumb is not None and os.path.exists(batch_thumb):
             os.remove(batch_thumb)
 
