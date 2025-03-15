@@ -75,6 +75,9 @@ def human_readable(size, decimal_places=2):
         size /= 1024
     return f"{size:.{decimal_places}f}PB"
 
+def format_eta(seconds):
+    """Format seconds as HH:MM:SS."""
+    return time.strftime("%H:%M:%S", time.gmtime(seconds))
 
 # =============================================================================
 #                           TELEGRAM BOT HANDLERS
@@ -97,7 +100,6 @@ async def start_handler(event):
     await asyncio.sleep(5)
     await bot.delete_messages(event.chat_id, msg.id)
 
-
 @bot.on(events.NewMessage(pattern=r'^/stop'))
 async def stop_handler(event):
     """
@@ -107,7 +109,6 @@ async def stop_handler(event):
     """
     await event.reply("**Stopped** 🚦")
     os.execl(sys.executable, sys.executable, *sys.argv)
-
 
 @bot.on(events.NewMessage(pattern=r'^/upload'))
 async def upload_handler(event):
@@ -378,7 +379,7 @@ async def upload_handler(event):
                     clip.close()
 
                     # ----------------------------------------------------------------
-                    # UPLOAD WITH PROGRESS CALLBACK
+                    # UPLOAD WITH PROGRESS CALLBACK using custom progress bar
                     # ----------------------------------------------------------------
                     progress_msg = await conv.send_message("Uploading file... 0%")
                     last_percent = 0
@@ -393,9 +394,28 @@ async def upload_handler(event):
                             dt = now - last_time
                             speed = (current - last_bytes) / dt if dt > 0 else 0
                             speed_str = human_readable(speed) + "/s"
+                            # Create a progress bar with 20 segments
+                            bar_length = 20
+                            filled_length = int(bar_length * current // total)
+                            progress_bar = "█" * filled_length + "░" * (bar_length - filled_length)
+                            perc_str = f"{percent:.2f}%"
+                            cur_str = human_readable(current)
+                            tot_str = human_readable(total)
+                            if speed > 0:
+                                eta_seconds = (total - current) / speed
+                                eta = format_eta(eta_seconds)
+                            else:
+                                eta = "Calculating..."
                             text = (
-                                f"Uploading: {percent:.2f}% "
-                                f"({human_readable(current)}/{human_readable(total)}) at {speed_str}"
+                                f"<b>\n"
+                                f" ╭──⌯════🆄︎ᴘʟᴏᴀᴅɪɴɢ⬆️⬆️═════⌯──╮ \n"
+                                f"├⚡ {progress_bar}|﹝{perc_str}﹞ \n"
+                                f"├🚀 Speed » {speed_str} \n"
+                                f"├📟 Processed » {cur_str}\n"
+                                f"├🧲 Size - ETA » {tot_str} - {eta} \n"
+                                f"├🤖 By » TechMon\n"
+                                f"╰─═══ ✪ TechMon ✪ ═══─╯\n"
+                                f"</b>"
                             )
                             try:
                                 await bot.edit_message(event.chat_id, progress_msg.id, text)
@@ -405,9 +425,6 @@ async def upload_handler(event):
                             last_time = now
                             last_bytes = current
 
-                    # ----------------------------------------------------------------
-                    # Upload using fast_upload
-                    # ----------------------------------------------------------------
                     with open(res_file, "rb") as file_obj:
                         uploaded_file = await fast_upload(bot, file_obj, progress_callback=progress_callback)
                     await bot.delete_messages(event.chat_id, progress_msg.id)
@@ -417,7 +434,6 @@ async def upload_handler(event):
                     # ----------------------------------------------------------------
                     uploaded_file.name = f"{file_name}.mp4"
                     attributes = [DocumentAttributeVideo(duration=duration_sec, w=width, h=height, supports_streaming=True)]
-
 
                     # ----------------------------------------------------------------
                     # Send the uploaded file with proper metadata and thumbnail
