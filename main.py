@@ -7,7 +7,6 @@ import requests
 import subprocess
 import logging
 import aiohttp
-from moviepy.editor import VideoFileClip  # for extracting video metadata
 from pyrogram import Client, filters
 from pyromod import listen  # provides an easy "conversation" interface
 
@@ -39,7 +38,7 @@ async def start_handler(client, message):
         "Send /stop to abort any ongoing task.</b>"
     )
     await asyncio.sleep(5)
-    await client.delete_messages(message.chat.id, msg.message_id)
+    await client.delete_messages(message.chat.id, msg.id)
 
 @app.on_message(filters.command("stop"))
 async def stop_handler(client, message):
@@ -54,7 +53,7 @@ async def upload_handler(client, message):
     # --- Step 1: Ask for TXT file ---
     q1 = await message.reply("Send TXT file ⚡️")
     txt_msg = await client.listen(chat_id)
-    await client.delete_messages(chat_id, [q1.message_id, txt_msg.message_id])
+    await client.delete_messages(chat_id, [q1.id, txt_msg.id])
     txt_path = await txt_msg.download()
     try:
         with open(txt_path, "r") as f:
@@ -65,7 +64,7 @@ async def upload_handler(client, message):
     except Exception as e:
         err_msg = await message.reply("**Invalid file input.**")
         await asyncio.sleep(3)
-        await client.delete_messages(chat_id, err_msg.message_id)
+        await client.delete_messages(chat_id, err_msg.id)
         os.remove(txt_path)
         return
 
@@ -75,7 +74,7 @@ async def upload_handler(client, message):
     )
     pw_msg = await client.listen(chat_id)
     pw_token = pw_msg.text.strip()
-    await client.delete_messages(chat_id, [q2.message_id, pw_msg.message_id])
+    await client.delete_messages(chat_id, [q2.id, pw_msg.id])
 
     # --- Step 3: Ask for starting link index ---
     q3 = await message.reply(
@@ -86,19 +85,19 @@ async def upload_handler(client, message):
         count = int(start_msg.text.strip())
     except:
         count = 1
-    await client.delete_messages(chat_id, [q3.message_id, start_msg.message_id])
+    await client.delete_messages(chat_id, [q3.id, start_msg.id])
 
     # --- Step 4: Ask for batch name ---
     q4 = await message.reply("Now send me your batch name:")
     batch_msg = await client.listen(chat_id)
     batch_name = batch_msg.text.strip()
-    await client.delete_messages(chat_id, [q4.message_id, batch_msg.message_id])
+    await client.delete_messages(chat_id, [q4.id, batch_msg.id])
 
     # --- Step 5: Ask for resolution ---
     q5 = await message.reply("Enter resolution (choose: 144, 240, 360, 480, 720, 1080):")
     res_msg = await client.listen(chat_id)
     raw_res = res_msg.text.strip()
-    await client.delete_messages(chat_id, [q5.message_id, res_msg.message_id])
+    await client.delete_messages(chat_id, [q5.id, res_msg.id])
     if raw_res == "144":
         res = "256x144"
     elif raw_res == "240":
@@ -120,7 +119,7 @@ async def upload_handler(client, message):
     caption_input = caption_msg.text.strip()
     highlighter = "️ ⁪⁬⁮⁮⁮"
     caption = highlighter if caption_input == 'Robin' else caption_input
-    await client.delete_messages(chat_id, [q6.message_id, caption_msg.message_id])
+    await client.delete_messages(chat_id, [q6.id, caption_msg.id])
 
     # --- Skip Thumbnail Step ---
     status_msg = await message.reply("Processing your links...")
@@ -217,50 +216,29 @@ async def upload_handler(client, message):
                     f"**⥥ DOWNLOADING... »**\n\n**Name »** `{file_name}`\n**Quality »** {raw_res}\n\n**URL »** `{url}`"
                 )
                 res_file = await helper.download_video(url, cmd, file_name)
-                await client.delete_messages(chat_id, dl_msg.message_id)
+                await client.delete_messages(chat_id, dl_msg.id)
 
-                # --- Extract video metadata using MoviePy ---
-                clip = VideoFileClip(res_file)
-                duration = int(clip.duration)
-                width, height = clip.size
-                clip.close()
-
-                total_size = os.path.getsize(res_file)
-                last_percent = 0
-                last_time = time.time()
-                last_bytes = 0
-
+                # --- Skip video metadata extraction ---
+                # Directly upload video without extracting duration, width, and height
                 progress_msg = await message.reply("Uploading file... 0%")
 
                 async def progress_callback(current, total):
-                    nonlocal last_percent, last_time, last_bytes
+                    nonlocal progress_msg
                     percent = (current / total) * 100
-                    if percent - last_percent >= 5 or current == total:
-                        now = time.time()
-                        dt = now - last_time
-                        speed = (current - last_bytes) / dt if dt > 0 else 0
-                        speed_str = human_readable(speed) + "/s"
-                        text = f"Uploading: {percent:.2f}% ({human_readable(current)}/{human_readable(total)}) at {speed_str}"
-                        try:
-                            await client.edit_message_text(chat_id, progress_msg.message_id, text)
-                        except Exception as ex:
-                            log.error(f"Progress update failed: {ex}")
-                        last_percent = percent
-                        last_time = now
-                        last_bytes = current
+                    text = f"Uploading: {percent:.2f}% ({human_readable(current)}/{human_readable(total)})"
+                    try:
+                        await client.edit_message_text(chat_id, progress_msg.id, text)
+                    except Exception as ex:
+                        log.error(f"Progress update failed: {ex}")
 
-                # --- Upload video using send_video with progress callback ---
                 await client.send_video(
                     chat_id,
                     video=res_file,
                     caption=cc,
-                    duration=duration,
-                    width=width,
-                    height=height,
                     supports_streaming=True,
                     progress=progress_callback
                 )
-                await client.delete_messages(chat_id, progress_msg.message_id)
+                await client.delete_messages(chat_id, progress_msg.id)
                 os.remove(res_file)
                 await asyncio.sleep(1)
         except Exception as e:
@@ -269,7 +247,7 @@ async def upload_handler(client, message):
             )
             continue
     await message.reply("**Done Boss 😎**")
-    await client.delete_messages(chat_id, status_msg.message_id)
+    await client.delete_messages(chat_id, status_msg.id)
 
 def main():
     print("Bot is running...")
