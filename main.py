@@ -132,7 +132,6 @@ async def upload_handler(event):
             thumb_path = None
             if thumb_msg.text.strip().lower() != "no":
                 thumb_path = None
-        # Use this thumbnail for every upload in the batch
         batch_thumb = thumb_path
 
         status_msg = await conv.send_message("Processing your links...")
@@ -266,8 +265,8 @@ async def upload_handler(event):
                     # Set the filename on the uploaded file so Telegram recognizes it as MP4
                     uploaded_file.name = f"{file_name}.mp4"
 
-                    # Create video attributes for proper metadata display
-                    attributes = [DocumentAttributeVideo(duration=duration, width=width, height=height, supports_streaming=True)]
+                    # Create video attributes using 'w' and 'h' instead of width/height
+                    attributes = [DocumentAttributeVideo(duration=duration, w=width, h=height, supports_streaming=True)]
 
                     # Send the uploaded file with correct metadata. If no thumbnail was provided, Telegram will generate one.
                     await bot.send_file(
