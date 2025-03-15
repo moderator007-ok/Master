@@ -15,12 +15,7 @@ from telethon.tl.types import DocumentAttributeVideo  # for video attributes
 from vars import API_ID, API_HASH, BOT_TOKEN
 import core as helper  # Assumes helper.download_video() and helper.download() exist
 
-# Import external fast_upload function (we won't use it for auto-thumbnail)
-try:
-    from devgagantools.spylib import fast_upload
-except ImportError:
-    from devgagantools.spylib import upload_file as fast_upload
-
+# (We no longer use fast_upload to let Telegram generate its thumbnail)
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("telethon")
@@ -30,11 +25,34 @@ bot = TelegramClient("bot", API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 
 # Helper function: convert bytes to human-readable format
 def human_readable(size, decimal_places=2):
-    for unit in ['B','KB','MB','GB','TB']:
+    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
         if size < 1024:
             return f"{size:.{decimal_places}f}{unit}"
         size /= 1024
     return f"{size:.{decimal_places}f}PB"
+
+# --- ProgressFile wrapper to report progress during file reading ---
+class ProgressFile:
+    def __init__(self, f, total, progress_callback):
+        self.f = f
+        self.total = total
+        self.progress_callback = progress_callback
+        self.current = 0
+
+    def read(self, size=-1):
+        data = self.f.read(size)
+        self.current += len(data)
+        self.progress_callback(self.current, self.total)
+        return data
+
+    def seek(self, offset, whence=0):
+        return self.f.seek(offset, whence)
+
+    def tell(self):
+        return self.f.tell()
+
+    def __getattr__(self, name):
+        return getattr(self.f, name)
 
 @bot.on(events.NewMessage(pattern=r'^/start'))
 async def start_handler(event):
@@ -225,14 +243,65 @@ async def upload_handler(event):
                     width, height = clip.size
                     clip.close()
 
-                    # --- UPLOAD: Use Telethon's standard upload_file for auto-generated thumbnail ---
-                    uploaded_file = await bot.upload_file(res_file)
+                    # --- UPLOAD WITH PROGRESS USING ProgressFile WRAPPER ---
+                    progress_msg = await conv.send_message("Uploading file... 0%")
+                    total_size = os.path.getsize(res_file)
+                    last_percent = 0
+                    last_time = time.time()
+                    last_bytes = 0
+
+                    def progress_callback(current, total):
+                        nonlocal last_percent, last_time, last_bytes
+                        percent = (current / total) * 100
+                        if percent - last_percent >= 5 or current == total:
+                            now = time.time()
+                            dt = now - last_time
+                            speed = (current - last_bytes) / dt if dt > 0 else 0
+                            speed_str = human_readable(speed) + "/s"
+                            text = f"Uploading: {percent:.2f}% ({human_readable(current)}/{human_readable(total)}) at {speed_str}"
+                            try:
+                                asyncio.create_task(bot.edit_message(event.chat_id, progress_msg.id, text))
+                            except Exception as ex:
+                                log.error(f"Progress update failed: {ex}")
+                            last_percent = percent
+                            last_time = now
+                            last_bytes = current
+
+                    # Wrap the file in ProgressFile to report progress
+                    class ProgressFile:
+                        def __init__(self, f, total, progress_callback):
+                            self.f = f
+                            self.total = total
+                            self.progress_callback = progress_callback
+                            self.current = 0
+
+                        def read(self, size=-1):
+                            data = self.f.read(size)
+                            self.current += len(data)
+                            self.progress_callback(self.current, self.total)
+                            return data
+
+                        def seek(self, offset, whence=0):
+                            return self.f.seek(offset, whence)
+
+                        def tell(self):
+                            return self.f.tell()
+
+                        def __getattr__(self, name):
+                            return getattr(self.f, name)
+
+                    with open(res_file, "rb") as f:
+                        pf = ProgressFile(f, total_size, progress_callback)
+                        uploaded_file = await bot.upload_file(pf)
+                    await bot.delete_messages(event.chat_id, progress_msg.id)
+
+                    # Set the filename so Telegram recognizes it as MP4
                     uploaded_file.name = f"{file_name}.mp4"
-                    
-                    # Create video attributes
+
+                    # Create video attributes with metadata
                     attributes = [DocumentAttributeVideo(duration=duration, w=width, h=height, supports_streaming=True)]
-                    
-                    # Send the file (without thumb so that Telegram auto-generates it)
+
+                    # Send the uploaded file; note that we do not pass a thumbnail, so Telegram auto-generates one.
                     await bot.send_file(
                         event.chat_id,
                         file=uploaded_file,
