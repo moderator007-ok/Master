@@ -15,7 +15,7 @@ from telethon.tl.types import DocumentAttributeVideo  # for video attributes
 from vars import API_ID, API_HASH, BOT_TOKEN
 import core as helper  # Assumes helper.download_video() and helper.download() exist
 
-# Import external fast_upload function from devgagantools library
+# Import external fast_upload function (we won't use it for auto-thumbnail)
 try:
     from devgagantools.spylib import fast_upload
 except ImportError:
@@ -123,7 +123,7 @@ async def upload_handler(event):
         await bot.delete_messages(event.chat_id, [q6.id, caption_msg.id])
 
         # --- Skip Thumbnail Step ---
-        # We always let Telegram autogenerate the thumbnail.
+        # We want Telegram to auto-generate the thumbnail from the video itself.
         status_msg = await conv.send_message("Processing your links...")
 
         # --- Process each link ---
@@ -225,41 +225,14 @@ async def upload_handler(event):
                     width, height = clip.size
                     clip.close()
 
-                    # --- UPLOAD WITH PROGRESS (update every ~5%) ---
-                    progress_msg = await conv.send_message("Uploading file... 0%")
-                    last_percent = 0
-                    last_time = time.time()
-                    last_bytes = 0
-
-                    async def progress_callback(current, total):
-                        nonlocal last_percent, last_time, last_bytes
-                        percent = (current / total) * 100
-                        if percent - last_percent >= 5 or current == total:
-                            now = time.time()
-                            dt = now - last_time
-                            speed = (current - last_bytes) / dt if dt > 0 else 0
-                            speed_str = human_readable(speed) + "/s"
-                            text = f"Uploading: {percent:.2f}% ({human_readable(current)}/{human_readable(total)}) at {speed_str}"
-                            try:
-                                await bot.edit_message(event.chat_id, progress_msg.id, text)
-                            except Exception as ex:
-                                log.error(f"Progress update failed: {ex}")
-                            last_percent = percent
-                            last_time = now
-                            last_bytes = current
-
-                    with open(res_file, "rb") as file_obj:
-                        uploaded_file = await fast_upload(bot, file_obj, progress_callback=progress_callback)
-                    await bot.delete_messages(event.chat_id, progress_msg.id)
-
-                    # Set the filename on the uploaded file so Telegram recognizes it as MP4
+                    # --- UPLOAD: Use Telethon's standard upload_file for auto-generated thumbnail ---
+                    uploaded_file = await bot.upload_file(res_file)
                     uploaded_file.name = f"{file_name}.mp4"
-
-                    # Create video attributes with metadata
+                    
+                    # Create video attributes
                     attributes = [DocumentAttributeVideo(duration=duration, w=width, h=height, supports_streaming=True)]
-
-                    # Send the uploaded file with correct metadata.
-                    # Note: We are not providing a thumbnail, so Telegram will autogenerate one.
+                    
+                    # Send the file (without thumb so that Telegram auto-generates it)
                     await bot.send_file(
                         event.chat_id,
                         file=uploaded_file,
@@ -273,10 +246,6 @@ async def upload_handler(event):
                 continue
         await conv.send_message("**Done Boss 😎**")
         await bot.delete_messages(event.chat_id, status_msg.id)
-        
-        # If a thumbnail file was provided (which we now ignore), delete it.
-        if batch_thumb is not None and os.path.exists(batch_thumb):
-            os.remove(batch_thumb)
 
 def main():
     print("Bot is running...")
