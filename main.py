@@ -9,7 +9,7 @@ import logging
 import aiohttp
 from pyrogram import Client, filters
 from pyromod import listen  # provides an easy "conversation" interface
-from pyrogram.connection import ConnectionTcpFull  # Use MTProto TCP for faster uploads
+from pyrogram.connection.connection_tcp_full import ConnectionTcpFull  # Correct import for MTProto TCP Full
 
 # Import configuration variables from your vars module
 from vars import API_ID, API_HASH, BOT_TOKEN
@@ -19,7 +19,7 @@ import core as helper  # Assumes helper.download_video() and helper.download() e
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("pyrogram")
 
-# Initialize the Pyrogram client with TCP connection
+# Initialize the Pyrogram client with TCP Full connection
 app = Client(
     "bot",
     api_id=API_ID,
