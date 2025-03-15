@@ -8,7 +8,7 @@ import subprocess
 import logging
 from telethon import TelegramClient, events
 import aiohttp
-from moviepy.editor import VideoFileClip  # to extract video metadata
+from moviepy.editor import VideoFileClip  # for extracting video metadata
 from telethon.tl.types import DocumentAttributeVideo  # for video attributes
 
 # Import configuration variables from your vars module
@@ -22,13 +22,17 @@ log = logging.getLogger("telethon")
 # Initialize the Telethon client
 bot = TelegramClient("bot", API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 
-# Helper function: convert bytes to human-readable format
+# Helper: convert bytes to human-readable format
 def human_readable(size, decimal_places=2):
-    for unit in ['B','KB','MB','GB','TB']:
+    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
         if size < 1024:
             return f"{size:.{decimal_places}f}{unit}"
         size /= 1024
     return f"{size:.{decimal_places}f}PB"
+
+# (Optional) ProgressFile wrapper if you want per-read progress reporting;
+# here we use Telethon's built-in progress_callback instead.
+# --- START OF MAIN HANDLER ---
 
 @bot.on(events.NewMessage(pattern=r'^/start'))
 async def start_handler(event):
@@ -117,7 +121,7 @@ async def upload_handler(event):
         await bot.delete_messages(event.chat_id, [q6.id, caption_msg.id])
 
         # --- Skip Thumbnail Step ---
-        # We want Telegram to auto-generate the thumbnail from the video itself.
+        # We want Telegram to auto-generate the thumbnail from the video.
         status_msg = await conv.send_message("Processing your links...")
 
         # --- Process each link ---
@@ -219,13 +223,12 @@ async def upload_handler(event):
                     width, height = clip.size
                     clip.close()
 
-                    # --- UPLOAD USING Telethon's upload_file with increased part_size ---
+                    # --- UPLOAD WITH PROGRESS ---
                     total_size = os.path.getsize(res_file)
-                    
-                    # Define a progress callback that updates every ~5%
                     last_percent = 0
                     last_time = time.time()
                     last_bytes = 0
+
                     async def progress_callback(current, total):
                         nonlocal last_percent, last_time, last_bytes
                         percent = (current / total) * 100
@@ -244,17 +247,17 @@ async def upload_handler(event):
                             last_bytes = current
 
                     progress_msg = await conv.send_message("Uploading file... 0%")
-                    # Increase part_size to 1MB to improve speed
-                    uploaded_file = await bot.upload_file(res_file, part_size=1024*1024, progress_callback=progress_callback)
+                    # Use part_size_kb=1024 (i.e. 1 MB per part) for higher speeds
+                    uploaded_file = await bot.upload_file(res_file, part_size_kb=1024, progress_callback=progress_callback)
                     await bot.delete_messages(event.chat_id, progress_msg.id)
-
-                    # Set filename so Telegram recognizes it as MP4
+                    
+                    # Set the filename on the uploaded file so Telegram recognizes it as MP4
                     uploaded_file.name = f"{file_name}.mp4"
-
-                    # Create video attributes with metadata
+                    
+                    # Create video attributes with metadata (using w and h)
                     attributes = [DocumentAttributeVideo(duration=duration, w=width, h=height, supports_streaming=True)]
-
-                    # Send the file (omitting the thumb so Telegram auto-generates one)
+                    
+                    # Send the uploaded file without passing a thumb so Telegram auto-generates the thumbnail
                     await bot.send_file(
                         event.chat_id,
                         file=uploaded_file,
