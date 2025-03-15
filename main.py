@@ -33,7 +33,7 @@ bot = TelegramClient("bot", API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 
 
 def human_readable(size, decimal_places=2):
-    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+    for unit in ["B", "KB", "MB", "GB", "TB"]:
         if size < 1024:
             return f"{size:.{decimal_places}f}{unit}"
         size /= 1024
@@ -56,7 +56,7 @@ def get_video_metadata(video_file):
     return duration, width, height
 
 
-@bot.on(events.NewMessage(pattern=r'^/start'))
+@bot.on(events.NewMessage(pattern=r"^/start"))
 async def start_handler(event):
     msg = await event.reply(
         f"<b>Hello {event.sender.first_name} 👋\n\n"
@@ -68,13 +68,13 @@ async def start_handler(event):
     await bot.delete_messages(event.chat_id, msg.id)
 
 
-@bot.on(events.NewMessage(pattern=r'^/stop'))
+@bot.on(events.NewMessage(pattern=r"^/stop"))
 async def stop_handler(event):
     await event.reply("**Stopped** 🚦")
     os.execl(sys.executable, sys.executable, *sys.argv)
 
 
-@bot.on(events.NewMessage(pattern=r'^/upload'))
+@bot.on(events.NewMessage(pattern=r"^/upload"))
 async def upload_handler(event):
     async with bot.conversation(event.chat_id) as conv:
         # Step 1: Ask for TXT file
@@ -108,7 +108,7 @@ async def upload_handler(event):
         start_msg = await conv.get_response()
         try:
             start_index = int(start_msg.text.strip())
-        except:
+        except Exception:
             start_index = 1
         await bot.delete_messages(event.chat_id, [q3.id, start_msg.id])
 
@@ -143,7 +143,7 @@ async def upload_handler(event):
         caption_msg = await conv.get_response()
         caption_input = caption_msg.text.strip()
         highlighter = "️ ⁪⁬⁮⁮⁮"
-        caption = highlighter if caption_input == 'Robin' else caption_input
+        caption = highlighter if caption_input == "Robin" else caption_input
         await bot.delete_messages(event.chat_id, [q6.id, caption_msg.id])
 
         # Step 7: Ask for thumbnail image
@@ -161,27 +161,36 @@ async def upload_handler(event):
         counter = start_index
         for i in range(start_index - 1, len(links)):
             # Reconstruct URL
-            V = links[i][1].replace("file/d/", "uc?export=download&id=") \
-                           .replace("www.youtube-nocookie.com/embed", "youtu.be") \
-                           .replace("?modestbranding=1", "") \
-                           .replace("/view?usp=sharing", "")
+            V = (
+                links[i][1]
+                .replace("file/d/", "uc?export=download&id=")
+                .replace("www.youtube-nocookie.com/embed", "youtu.be")
+                .replace("?modestbranding=1", "")
+                .replace("/view?usp=sharing", "")
+            )
             url = "https://" + V
 
             # Special URL processing
             if "visionias" in url:
                 async with aiohttp.ClientSession() as session:
-                    async with session.get(url, headers={
-                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-                        'User-Agent': 'Mozilla/5.0'
-                    }) as resp:
+                    async with session.get(
+                        url,
+                        headers={
+                            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+                            "User-Agent": "Mozilla/5.0",
+                        },
+                    ) as resp:
                         text = await resp.text()
                         m_obj = re.search(r"(https://.*?playlist\.m3u8.*?)\"", text)
                         if m_obj:
                             url = m_obj.group(1)
-            elif 'videos.classplusapp' in url:
+            elif "videos.classplusapp" in url:
                 api_url = "https://api.classplusapp.com/cams/uploader/video/jw-signed-url?url=" + url
-                url = requests.get(api_url, headers={'x-access-token': 'TOKEN'}).json()['url']
-            elif '/master.mpd' in url:
+                try:
+                    url = requests.get(api_url, headers={"x-access-token": "TOKEN"}).json()["url"]
+                except Exception:
+                    url = url  # fallback if API fails
+            elif "/master.mpd" in url:
                 if "d1d34p8vz63oiq.cloudfront.net" in url:
                     parts = url.split("/")
                     extracted_id = parts[3] if len(parts) > 3 else None
@@ -197,11 +206,22 @@ async def upload_handler(event):
                     id_part = url.split("/")[-2]
                     url = "https://d26g5bnklkwsh4.cloudfront.net/" + id_part + "/master.m3u8"
 
-            name1 = links[i][0].replace("\t", "").replace(":", "").replace("/", "") \
-                               .replace("+", "").replace("#", "").replace("|", "") \
-                               .replace("@", "").replace("*", "").replace(".", "") \
-                               .replace("https", "").replace("http", "").strip()
-            file_name = f'{str(i+1).zfill(3)}) {name1[:60]}'
+            name1 = (
+                links[i][0]
+                .replace("\t", "")
+                .replace(":", "")
+                .replace("/", "")
+                .replace("+", "")
+                .replace("#", "")
+                .replace("|", "")
+                .replace("@", "")
+                .replace("*", "")
+                .replace(".", "")
+                .replace("https", "")
+                .replace("http", "")
+                .strip()
+            )
+            file_name = f"{str(i+1).zfill(3)}) {name1[:60]}"
             if "youtu" in url:
                 ytf = f"b[height<={raw_res}][ext=mp4]/bv[height<={raw_res}][ext=mp4]+ba[ext=m4a]/b[ext=mp4]"
             else:
@@ -213,12 +233,16 @@ async def upload_handler(event):
                 cmd = f'yt-dlp -f "{ytf}" "{url}" -o "{file_name}.mp4"'
 
             try:
-                cc = (f'**[📽️] Vid_ID:** {str(i+1).zfill(3)}. {name1}{caption}.mkv\n'
-                      f'**Batch Name »** {batch_name}\n'
-                      f'**Downloaded By :** TechMon ❤️‍🔥 @TechMonX')
-                cc1 = (f'**[📁] Pdf_ID:** {str(i+1).zfill(3)}. {name1}{caption}.pdf\n'
-                       f'**Batch Name »** {batch_name}\n'
-                       f'**Downloaded By :** TechMon ❤️‍🔥 @TechMonX')
+                cc = (
+                    f"**[📽️] Vid ID:** {str(i+1).zfill(3)}. {name1}{caption}.mkv\n"
+                    f"**Batch Name »** {batch_name}\n"
+                    f"**Downloaded By :** TechMon ❤️‍🔥 @TechMonX"
+                )
+                cc1 = (
+                    f"**[📁] Pdf ID:** {str(i+1).zfill(3)}. {name1}{caption}.pdf\n"
+                    f"**Batch Name »** {batch_name}\n"
+                    f"**Downloaded By :** TechMon ❤️‍🔥 @TechMonX"
+                )
                 if "drive" in url:
                     try:
                         ka = await helper.download(url, file_name)
@@ -227,6 +251,10 @@ async def upload_handler(event):
                         counter += 1
                         os.remove(ka)
                         await asyncio.sleep(1)
+                    except FloodWait as e:
+                        await conv.send_message(f"FloodWait encountered: sleeping for {e.seconds} seconds")
+                        await asyncio.sleep(e.seconds)
+                        continue
                     except Exception:
                         err_str = traceback.format_exc()
                         await conv.send_message(err_str)
@@ -237,20 +265,26 @@ async def upload_handler(event):
                         cmd_pdf = f'yt-dlp -o "{file_name}.pdf" "{url}"'
                         download_cmd = f"{cmd_pdf} -R 25 --fragment-retries 25"
                         os.system(download_cmd)
-                        await bot.send_file(event.chat_id, file=f'{file_name}.pdf', caption=cc1)
+                        await bot.send_file(event.chat_id, file=f"{file_name}.pdf", caption=cc1)
                         counter += 1
-                        os.remove(f'{file_name}.pdf')
+                        os.remove(f"{file_name}.pdf")
                         await asyncio.sleep(1)
+                    except FloodWait as e:
+                        await conv.send_message(f"FloodWait encountered: sleeping for {e.seconds} seconds")
+                        await asyncio.sleep(e.seconds)
+                        continue
                     except Exception:
                         err_str = traceback.format_exc()
                         await conv.send_message(err_str)
                         await asyncio.sleep(5)
                         continue
                 else:
-                    Show = (f"**⥥ DOWNLOADING... »**\n\n"
-                            f"**Name »** `{file_name}`\n"
-                            f"**Quality »** {raw_res}\n\n"
-                            f"**URL »** `{url}`")
+                    Show = (
+                        f"**⥥ DOWNLOADING... »**\n\n"
+                        f"**Name »** `{file_name}`\n"
+                        f"**Quality »** {raw_res}\n\n"
+                        f"**URL »** `{url}`"
+                    )
                     prog = await conv.send_message(Show)
                     res_file = await helper.download_video(url, cmd, file_name)
                     await bot.delete_messages(event.chat_id, prog.id)
@@ -276,8 +310,10 @@ async def upload_handler(event):
                             dt = now - last_time
                             speed = (current - last_bytes) / dt if dt > 0 else 0
                             speed_str = human_readable(speed) + "/s"
-                            text = (f"Uploading: {percent:.2f}% "
-                                    f"({human_readable(current)}/{human_readable(total)}) at {speed_str}")
+                            text = (
+                                f"Uploading: {percent:.2f}% "
+                                f"({human_readable(current)}/{human_readable(total)}) at {speed_str}"
+                            )
                             try:
                                 await bot.edit_message(event.chat_id, progress_msg.id, text)
                             except Exception:
@@ -287,14 +323,23 @@ async def upload_handler(event):
                             last_bytes = current
 
                     with open(res_file, "rb") as file_obj:
-                        uploaded_file = await fast_upload(bot, file_obj, progress_callback=progress_callback)
+                        uploaded_file = await fast_upload(
+                            bot, file_obj, progress_callback=progress_callback
+                        )
                     await bot.delete_messages(event.chat_id, progress_msg.id)
 
                     # Set the filename so Telegram recognizes it as MP4
                     uploaded_file.name = f"{file_name}.mp4"
 
                     # Create video attributes for correct metadata display
-                    attributes = [DocumentAttributeVideo(duration=duration, width=width, height=height, supports_streaming=True)]
+                    attributes = [
+                        DocumentAttributeVideo(
+                            duration=duration,
+                            width=width,
+                            height=height,
+                            supports_streaming=True,
+                        )
+                    ]
 
                     await bot.send_file(
                         event.chat_id,
@@ -302,16 +347,25 @@ async def upload_handler(event):
                         caption=cc,
                         supports_streaming=True,
                         attributes=attributes,
-                        thumb=batch_thumb
+                        thumb=batch_thumb,
                     )
                     counter += 1
                     await asyncio.sleep(1)
+            except FloodWait as e:
+                await conv.send_message(f"FloodWait encountered: sleeping for {e.seconds} seconds")
+                await asyncio.sleep(e.seconds)
+                continue
             except Exception:
                 err_str = traceback.format_exc()
                 await conv.send_message(
                     f"**Downloading Interrupted**\n{err_str}\n**Name »** {file_name}\n**URL »** `{url}`"
                 )
                 continue
+        await conv.send_message("**Done Boss 😎**")
+        await bot.delete_messages(event.chat_id, status_msg.id)
+    except FloodWait as e:
+        await conv.send_message(f"FloodWait encountered: sleeping for {e.seconds} seconds")
+        await asyncio.sleep(e.seconds)
     except Exception:
         err_str = traceback.format_exc()
         await conv.send_message(err_str)
@@ -324,5 +378,5 @@ def main():
     bot.run_until_disconnected()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
