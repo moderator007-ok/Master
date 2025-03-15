@@ -29,7 +29,7 @@ log = logging.getLogger("telethon")
 # Initialize the Telethon client
 bot = TelegramClient("bot", API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 
-# Helper function: convert bytes to human-readable format
+
 def human_readable(size, decimal_places=2):
     for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
         if size < 1024:
@@ -37,7 +37,7 @@ def human_readable(size, decimal_places=2):
         size /= 1024
     return f"{size:.{decimal_places}f}PB"
 
-# Helper function to generate a thumbnail using ffmpeg
+
 def generate_thumbnail(video_file, thumb_output="generated_thumb.jpg", time_stamp="00:00:01"):
     cmd = ["ffmpeg", "-y", "-i", video_file, "-ss", time_stamp, "-vframes", "1", thumb_output]
     result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -45,13 +45,14 @@ def generate_thumbnail(video_file, thumb_output="generated_thumb.jpg", time_stam
         return thumb_output
     return None
 
-# Helper function to extract video metadata using MoviePy
+
 def get_video_metadata(video_file):
     clip = VideoFileClip(video_file)
     duration = int(clip.duration)
     width, height = clip.size
     clip.close()
     return duration, width, height
+
 
 @bot.on(events.NewMessage(pattern=r'^/start'))
 async def start_handler(event):
@@ -64,10 +65,12 @@ async def start_handler(event):
     await asyncio.sleep(5)
     await bot.delete_messages(event.chat_id, msg.id)
 
+
 @bot.on(events.NewMessage(pattern=r'^/stop'))
 async def stop_handler(event):
     await event.reply("**Stopped** 🚦")
     os.execl(sys.executable, sys.executable, *sys.argv)
+
 
 @bot.on(events.NewMessage(pattern=r'^/upload'))
 async def upload_handler(event):
@@ -95,7 +98,7 @@ async def upload_handler(event):
         pw_msg = await conv.get_response()
         pw_token = pw_msg.text.strip()
         await bot.delete_messages(event.chat_id, [q2.id, pw_msg.id])
-
+        
         # Step 3: Ask for starting link index
         q3 = await conv.send_message(
             f"**Total links found:** **{len(links)}**\n\nSend a number indicating from which link you want to start downloading (e.g. 1)."
@@ -278,7 +281,7 @@ async def upload_handler(event):
                     # Set the filename so Telegram recognizes it as MP4
                     uploaded_file.name = f"{file_name}.mp4"
 
-                    # Create video attributes for correct metadata display (including duration, width, height)
+                    # Create video attributes for correct metadata display
                     attributes = [DocumentAttributeVideo(duration=duration, width=width, height=height, supports_streaming=True)]
 
                     await bot.send_file(
@@ -301,9 +304,11 @@ async def upload_handler(event):
     await conv.send_message("**Done Boss 😎**")
     await bot.delete_messages(event.chat_id, status_msg.id)
 
+
 def main():
     print("Bot is running...")
     bot.run_until_disconnected()
+
 
 if __name__ == '__main__':
     main()
