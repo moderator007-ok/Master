@@ -433,7 +433,7 @@ async def upload_handler(event):
                     # Set the uploaded file's name and add video attributes
                     # ----------------------------------------------------------------
                     uploaded_file.name = f"{file_name}.mp4"
-                    attributes = [DocumentAttributeVideo(duration=duration_sec, w=width, h=height, supports_streaming=True)]
+                    attributes = [DocumentAttributeVideo(duration=duration, w=width, h=height, supports_streaming=True)]
 
                     # ----------------------------------------------------------------
                     # Send the uploaded file with proper metadata and thumbnail
