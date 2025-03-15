@@ -52,7 +52,6 @@ async def start_handler(bot: Client, m):
 @bot.on_message(filters.command("stop"))
 async def stop_handler(bot: Client, m):
     await m.reply_text("**Stopped** 🚦")
-    # Restart the script (or exit)
     os.execl(sys.executable, sys.executable, *sys.argv)
 
 
@@ -63,18 +62,20 @@ async def upload_handler(bot: Client, m):
     # --- Step 1: Ask for TXT file ---
     editable = await m.reply_text('𝕤ᴇɴᴅ ᴛxᴛ ғɪʟᴇ ⚡️')
     input_msg = await bot.listen(editable.chat.id)
-    txt_path = await input_msg.download()
+    x = await input_msg.download()
     await input_msg.delete(True)
 
     try:
-        with open(txt_path, "r") as f:
+        with open(x, "r") as f:
             content = f.read()
-        content = content.splitlines()
-        links = [line.split("://", 1) for line in content if line.strip()]
-        os.remove(txt_path)
+        content = content.split("\n")
+        links = []
+        for i in content:
+            links.append(i.split("://", 1))
+        os.remove(x)
     except Exception:
         await m.reply_text("**Invalid file input.**")
-        os.remove(txt_path)
+        os.remove(x)
         return
 
     # --- Step 2: Ask for PW token ---
@@ -92,16 +93,16 @@ async def upload_handler(bot: Client, m):
     start_msg = await bot.listen(editable.chat.id)
     try:
         start_index = int(start_msg.text.strip())
-    except Exception:
+    except:
         start_index = 1
     await bot.delete_messages(chat_id, [q3.id, start_msg.id])
 
     # --- Step 4: Ask for batch name ---
     q4 = await m.reply_text("Now send me your batch name:")
-    batch_msg = await bot.listen(editable.chat.id)
-    batch_name = batch_msg.text.strip()
-    await bot.delete_messages(chat_id, [q4.id, batch_msg.id])
-
+    input1 = await bot.listen(editable.chat.id)
+    batch_name = input1.text.strip()
+    await input1.delete(True)
+    
     # --- Step 5: Ask for resolution ---
     q5 = await m.reply_text("Enter resolution (choose: 144, 240, 360, 480, 720, 1080):")
     res_msg = await bot.listen(editable.chat.id)
@@ -145,7 +146,6 @@ async def upload_handler(bot: Client, m):
         thumb = None
 
     # --- Processing Links ---
-    # Set the counter based on starting index
     counter = start_index
 
     status_msg = await m.reply_text("Processing your links...")
@@ -174,7 +174,7 @@ async def upload_handler(bot: Client, m):
                         if m_obj:
                             url = m_obj.group(1)
             elif 'videos.classplusapp' in url:
-                api_url = f"https://api.classplusapp.com/cams/uploader/video/jw-signed-url?url={url}"
+                api_url = f'https://api.classplusapp.com/cams/uploader/video/jw-signed-url?url={url}'
                 url = requests.get(api_url, headers={'x-access-token': 'TOKEN'}).json()['url']
             elif '/master.mpd' in url:
                 if "d1d34p8vz63oiq" in url or "sec1.pw.live" in url:
@@ -199,8 +199,8 @@ async def upload_handler(bot: Client, m):
                 cmd = f'yt-dlp -f "{ytf}" "{url}" -o "{file_name}.mp4"'
 
             try:  
-                cc = f'**[📽️] Vid_ID:** {str(i+1).zfill(3)}. {name1}{caption}.mkv\n**Batch Name »** {raw_text0}\n**Downloaded By :** TechMon ❤️‍🔥 @TechMonX'
-                cc1 = f'**[📁] Pdf_ID:** {str(i+1).zfill(3)}. {name1}{caption}.pdf\n**Batch Name »** {raw_text0}\n**Downloaded By :** TechMon ❤️‍🔥 @TechMonX'
+                cc = f'**[📽️] Vid_ID:** {str(i+1).zfill(3)}. {name1}{caption}.mkv\n**Batch Name »** {batch_name}\n**Downloaded By :** TechMon ❤️‍🔥 @TechMonX'
+                cc1 = f'**[📁] Pdf_ID:** {str(i+1).zfill(3)}. {name1}{caption}.pdf\n**Batch Name »** {batch_name}\n**Downloaded By :** TechMon ❤️‍🔥 @TechMonX'
                 if "drive" in url:
                     try:
                         ka = await helper.download(url, file_name)
@@ -231,7 +231,6 @@ async def upload_handler(bot: Client, m):
                     prog = await m.reply_text(Show)
                     res_file = await helper.download_video(url, cmd, file_name)
                     await bot.delete_messages(m.chat.id, prog.id)
-                    # Use helper.send_vid (your working upload method)
                     await helper.send_vid(bot, m, cc, res_file, thumb, file_name, prog)
                     counter += 1
                     await asyncio.sleep(1)
