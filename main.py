@@ -24,15 +24,11 @@ bot = TelegramClient("bot", API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 
 # Helper: convert bytes to human-readable format
 def human_readable(size, decimal_places=2):
-    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+    for unit in ['B','KB','MB','GB','TB']:
         if size < 1024:
             return f"{size:.{decimal_places}f}{unit}"
         size /= 1024
     return f"{size:.{decimal_places}f}PB"
-
-# (Optional) ProgressFile wrapper if you want per-read progress reporting;
-# here we use Telethon's built-in progress_callback instead.
-# --- START OF MAIN HANDLER ---
 
 @bot.on(events.NewMessage(pattern=r'^/start'))
 async def start_handler(event):
@@ -223,7 +219,7 @@ async def upload_handler(event):
                     width, height = clip.size
                     clip.close()
 
-                    # --- UPLOAD WITH PROGRESS ---
+                    # --- UPLOAD USING Telethon's upload_file with part_size_kb set to 512 (max allowed) ---
                     total_size = os.path.getsize(res_file)
                     last_percent = 0
                     last_time = time.time()
@@ -247,17 +243,16 @@ async def upload_handler(event):
                             last_bytes = current
 
                     progress_msg = await conv.send_message("Uploading file... 0%")
-                    # Use part_size_kb=1024 (i.e. 1 MB per part) for higher speeds
-                    uploaded_file = await bot.upload_file(res_file, part_size_kb=1024, progress_callback=progress_callback)
+                    uploaded_file = await bot.upload_file(res_file, part_size_kb=512, progress_callback=progress_callback)
                     await bot.delete_messages(event.chat_id, progress_msg.id)
-                    
-                    # Set the filename on the uploaded file so Telegram recognizes it as MP4
+
+                    # Set filename so Telegram recognizes it as MP4
                     uploaded_file.name = f"{file_name}.mp4"
-                    
-                    # Create video attributes with metadata (using w and h)
+
+                    # Create video attributes with metadata
                     attributes = [DocumentAttributeVideo(duration=duration, w=width, h=height, supports_streaming=True)]
-                    
-                    # Send the uploaded file without passing a thumb so Telegram auto-generates the thumbnail
+
+                    # Send the file (no thumb provided, so Telegram auto-generates it)
                     await bot.send_file(
                         event.chat_id,
                         file=uploaded_file,
