@@ -7,6 +7,8 @@ import requests
 import subprocess
 import logging
 import aiohttp
+import traceback
+
 from telethon import TelegramClient, events
 from telethon.tl.types import DocumentAttributeVideo  # for video attributes
 from moviepy.editor import VideoFileClip  # to extract video metadata
@@ -94,9 +96,7 @@ async def upload_handler(event):
             return
 
         # Step 2: Ask for PW token
-        q2 = await conv.send_message(
-            "Are there any password-protected links in this file? If yes, send the PW token. If not, type 'no'."
-        )
+        q2 = await conv.send_message("Are there any password-protected links in this file? If yes, send the PW token. If not, type 'no'.")
         pw_msg = await conv.get_response()
         pw_token = pw_msg.text.strip()
         await bot.delete_messages(event.chat_id, [q2.id, pw_msg.id])
@@ -213,8 +213,12 @@ async def upload_handler(event):
                 cmd = f'yt-dlp -f "{ytf}" "{url}" -o "{file_name}.mp4"'
 
             try:
-                cc = f'**[📽️] Vid_ID:** {str(i+1).zfill(3)}. {name1}{caption}.mkv\n**Batch Name »** {batch_name}\n**Downloaded By :** TechMon ❤️‍🔥 @TechMonX'
-                cc1 = f'**[📁] Pdf_ID:** {str(i+1).zfill(3)}. {name1}{caption}.pdf\n**Batch Name »** {batch_name}\n**Downloaded By :** TechMon ❤️‍🔥 @TechMonX'
+                cc = (f'**[📽️] Vid_ID:** {str(i+1).zfill(3)}. {name1}{caption}.mkv\n'
+                      f'**Batch Name »** {batch_name}\n'
+                      f'**Downloaded By :** TechMon ❤️‍🔥 @TechMonX')
+                cc1 = (f'**[📁] Pdf_ID:** {str(i+1).zfill(3)}. {name1}{caption}.pdf\n'
+                       f'**Batch Name »** {batch_name}\n'
+                       f'**Downloaded By :** TechMon ❤️‍🔥 @TechMonX')
                 if "drive" in url:
                     try:
                         ka = await helper.download(url, file_name)
@@ -223,8 +227,9 @@ async def upload_handler(event):
                         counter += 1
                         os.remove(ka)
                         await asyncio.sleep(1)
-                    except Exception as e:
-                        await conv.send_message(str(e))
+                    except Exception:
+                        err_str = traceback.format_exc()
+                        await conv.send_message(err_str)
                         await asyncio.sleep(5)
                         continue
                 elif ".pdf" in url:
@@ -236,12 +241,16 @@ async def upload_handler(event):
                         counter += 1
                         os.remove(f'{file_name}.pdf')
                         await asyncio.sleep(1)
-                    except Exception as e:
-                        await conv.send_message(str(e))
+                    except Exception:
+                        err_str = traceback.format_exc()
+                        await conv.send_message(err_str)
                         await asyncio.sleep(5)
                         continue
                 else:
-                    Show = f"**⥥ DOWNLOADING... »**\n\n**Name »** `{file_name}`\n**Quality »** {raw_res}\n\n**URL »** `{url}`"
+                    Show = (f"**⥥ DOWNLOADING... »**\n\n"
+                            f"**Name »** `{file_name}`\n"
+                            f"**Quality »** {raw_res}\n\n"
+                            f"**URL »** `{url}`")
                     prog = await conv.send_message(Show)
                     res_file = await helper.download_video(url, cmd, file_name)
                     await bot.delete_messages(event.chat_id, prog.id)
@@ -267,11 +276,12 @@ async def upload_handler(event):
                             dt = now - last_time
                             speed = (current - last_bytes) / dt if dt > 0 else 0
                             speed_str = human_readable(speed) + "/s"
-                            text = f"Uploading: {percent:.2f}% ({human_readable(current)}/{human_readable(total)}) at {speed_str}"
+                            text = (f"Uploading: {percent:.2f}% "
+                                    f"({human_readable(current)}/{human_readable(total)}) at {speed_str}")
                             try:
                                 await bot.edit_message(event.chat_id, progress_msg.id, text)
-                            except Exception as ex:
-                                log.error(f"Progress update failed: {ex}")
+                            except Exception:
+                                log.error(traceback.format_exc())
                             last_percent = percent
                             last_time = now
                             last_bytes = current
@@ -296,13 +306,15 @@ async def upload_handler(event):
                     )
                     counter += 1
                     await asyncio.sleep(1)
-            except Exception as e:
+            except Exception:
+                err_str = traceback.format_exc()
                 await conv.send_message(
-                    f"**Downloading Interrupted**\n{str(e)}\n**Name »** {file_name}\n**URL »** `{url}`"
+                    f"**Downloading Interrupted**\n{err_str}\n**Name »** {file_name}\n**URL »** `{url}`"
                 )
                 continue
-    except Exception as e:
-        await conv.send_message(str(e))
+    except Exception:
+        err_str = traceback.format_exc()
+        await conv.send_message(err_str)
     await conv.send_message("**Done Boss 😎**")
     await bot.delete_messages(event.chat_id, status_msg.id)
 
