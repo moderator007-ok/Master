@@ -9,6 +9,7 @@ import logging
 import aiohttp
 from pyrogram import Client, filters
 from pyromod import listen  # provides an easy "conversation" interface
+from pyrogram.connection import ConnectionTcpFull  # Use MTProto TCP for faster uploads
 
 # Import configuration variables from your vars module
 from vars import API_ID, API_HASH, BOT_TOKEN
@@ -18,8 +19,14 @@ import core as helper  # Assumes helper.download_video() and helper.download() e
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("pyrogram")
 
-# Initialize the Pyrogram client
-app = Client("bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+# Initialize the Pyrogram client with TCP connection
+app = Client(
+    "bot",
+    api_id=API_ID,
+    api_hash=API_HASH,
+    bot_token=BOT_TOKEN,
+    connection=ConnectionTcpFull
+)
 
 # Helper: convert bytes to human-readable format
 def human_readable(size, decimal_places=2):
@@ -218,18 +225,20 @@ async def upload_handler(client, message):
                 res_file = await helper.download_video(url, cmd, file_name)
                 await client.delete_messages(chat_id, dl_msg.id)
 
-                # --- Skip video metadata extraction ---
-                # Directly upload video without extracting duration, width, and height
+                # --- Upload Video with 5% Progress Updates ---
                 progress_msg = await message.reply("Uploading file... 0%")
+                last_percent = 0
 
                 async def progress_callback(current, total):
-                    nonlocal progress_msg
+                    nonlocal last_percent, progress_msg
                     percent = (current / total) * 100
-                    text = f"Uploading: {percent:.2f}% ({human_readable(current)}/{human_readable(total)})"
-                    try:
-                        await client.edit_message_text(chat_id, progress_msg.id, text)
-                    except Exception as ex:
-                        log.error(f"Progress update failed: {ex}")
+                    if (percent - last_percent >= 5) or (current == total):
+                        text = f"Uploading: {percent:.2f}% ({human_readable(current)}/{human_readable(total)})"
+                        try:
+                            await client.edit_message_text(chat_id, progress_msg.id, text)
+                        except Exception as ex:
+                            log.error(f"Progress update failed: {ex}")
+                        last_percent = percent
 
                 await client.send_video(
                     chat_id,
