@@ -31,7 +31,7 @@ bot = TelegramClient("bot", API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 
 # Helper function: convert bytes to human-readable format
 def human_readable(size, decimal_places=2):
-    for unit in ['B','KB','MB','GB','TB']:
+    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
         if size < 1024:
             return f"{size:.{decimal_places}f}{unit}"
         size /= 1024
@@ -96,8 +96,6 @@ async def upload_handler(event):
         pw_token = pw_msg.text.strip()
         await bot.delete_messages(event.chat_id, [q2.id, pw_msg.id])
         
-        # --- (MadxAPI ID is now extracted from the URL itself) ---
-
         # --- Step 3: Ask for starting link index ---
         q3 = await conv.send_message(f"**Total links found:** **{len(links)}**\n\nSend a number indicating from which link you want to start downloading (e.g. 1).")
         start_msg = await conv.get_response()
@@ -162,7 +160,7 @@ async def upload_handler(event):
                            .replace("/view?usp=sharing", "")
             url = "https://" + V
 
-            # Special URL processing:
+            # Special URL processing
             if "visionias" in url:
                 async with aiohttp.ClientSession() as session:
                     async with session.get(url, headers={
@@ -177,10 +175,9 @@ async def upload_handler(event):
                 api_url = "https://api.classplusapp.com/cams/uploader/video/jw-signed-url?url=" + url
                 url = requests.get(api_url, headers={'x-access-token': 'TOKEN'}).json()['url']
             elif '/master.mpd' in url:
-                # For links on d1d34p8vz63oiq.cloudfront.net, extract the madxapi id from the URL.
+                # If the URL is from cloudfront, extract the madxapi id from the URL
                 if "d1d34p8vz63oiq.cloudfront.net" in url:
                     parts = url.split("/")
-                    # Expecting format: https://d1d34p8vz63oiq.cloudfront.net/<madxapi_id>/master.mpd
                     extracted_id = parts[3] if len(parts) > 3 else None
                     if extracted_id:
                         url = f"https://madxapi-d0cbf6ac738c.herokuapp.com/{extracted_id}/master.m3u8?token={pw_token}"
