@@ -237,7 +237,6 @@ async def upload_handler(event):
             thumb_path = None
             if thumb_msg.text.strip().lower() != "no":
                 thumb_path = None
-        # 'batch_thumb' will be used for all files if provided; otherwise we generate one per file
         batch_thumb = thumb_path
 
         # STATUS: Notify user of processing start
@@ -258,7 +257,6 @@ async def upload_handler(event):
             # Special URL processing for specific providers
             if "visionias" in url:
                 async with aiohttp.ClientSession() as session:
-                    # Mimic browser headers using our helper function
                     headers = get_browser_headers()
                     async with session.get(url, headers=headers) as resp:
                         text = await resp.text()
@@ -273,9 +271,6 @@ async def upload_handler(event):
                 except Exception as e:
                     log.error(f"Error processing Classplusapp URL: {e}")
             elif '/master.mpd' in url:
-                # Updated handling for master.mpd URLs:
-                # For Telegram Download Bot, always use the madxapi endpoint.
-                # Extract the URL id from the original URL and construct new URL.
                 url_parts = url.split('/')
                 url_id = url_parts[3] if len(url_parts) > 3 else ""
                 url = f"https://madxapi-d0cbf6ac738c.herokuapp.com/{url_id}/master.m3u8?token={pw_token}"
@@ -294,20 +289,26 @@ async def upload_handler(event):
             else:
                 ytf = f"b[height<={raw_res}]/bv[height<={raw_res}]+ba/b/bv+ba"
 
-            # Build the yt-dlp command for video downloading with verbose output,
-            # increased socket timeout, and enforcing TLS v1.2 for aria2c.
+            # Build the yt-dlp command for video downloading.
+            # The command now uses aria2c as the external downloader with the additional flag
+            # --no-check-certificate (bypassing certificate verification for aria2c only),
+            # verbose output (-v), increased socket timeout, and TLS enforcement.
+            if USE_NATIVE_DOWNLOADER:
+                downloader_cmd = ""  # Use native downloader (no external downloader arguments)
+            else:
+                downloader_cmd = (
+                    '--external-downloader aria2c '
+                    '--external-downloader-args "-x 16 -s 16 -k 1M --min-tls-version=TLSv1.2 --no-check-certificate --timeout=120 --connect-timeout=120 '
+                    '--max-download-limit=0 --max-overall-download-limit=0 --enable-http-pipelining=true --file-allocation=falloc"'
+                )
             if "jw-prod" in url:
                 cmd = (
-                    f'yt-dlp -v --socket-timeout 300 --external-downloader aria2c '
-                    f'--external-downloader-args "-x 16 -s 16 -k 1M --min-tls-version=TLSv1.2 --timeout=120 --connect-timeout=120 '
-                    f'--max-download-limit=0 --max-overall-download-limit=0 --enable-http-pipelining=true --file-allocation=falloc" '
+                    f'yt-dlp -v --socket-timeout 600 {downloader_cmd} '
                     f'-o "{file_name}.mp4" "{url}"'
                 )
             else:
                 cmd = (
-                    f'yt-dlp -v --socket-timeout 300 --external-downloader aria2c '
-                    f'--external-downloader-args "-x 16 -s 16 -k 1M --min-tls-version=TLSv1.2 --timeout=120 --connect-timeout=120 '
-                    f'--max-download-limit=0 --max-overall-download-limit=0 --enable-http-pipelining=true --file-allocation=falloc" '
+                    f'yt-dlp -v --socket-timeout 600 {downloader_cmd} '
                     f'-f "{ytf}" "{url}" -o "{file_name}.mp4"'
                 )
 
@@ -339,9 +340,7 @@ async def upload_handler(event):
                 elif ".pdf" in url:
                     try:
                         cmd_pdf = (
-                            f'yt-dlp -v --socket-timeout 300 --external-downloader aria2c '
-                            f'--external-downloader-args "-x 16 -s 16 -k 1M --min-tls-version=TLSv1.2 --timeout=120 --connect-timeout=120 '
-                            f'--max-download-limit=0 --max-overall-download-limit=0 --enable-http-pipelining=true --file-allocation=falloc" '
+                            f'yt-dlp -v --socket-timeout 600 {downloader_cmd} '
                             f'-o "{file_name}.pdf" "{url}"'
                         )
                         download_cmd = f"{cmd_pdf} -R 25 --fragment-retries 25"
@@ -354,7 +353,6 @@ async def upload_handler(event):
                         await asyncio.sleep(5)
                         continue
                 else:
-                    # Download the video using helper.download_video with retry logic
                     retry_attempts = 3
                     res_file = None
                     for attempt in range(1, retry_attempts+1):
@@ -367,12 +365,11 @@ async def upload_handler(event):
                         except Exception as e:
                             log.warning(f"Attempt {attempt} failed for {file_name}. Error: {e}")
                             if attempt < retry_attempts:
-                                await asyncio.sleep(2)
+                                await asyncio.sleep(10)
                             else:
                                 raise Exception(f"All retry attempts failed. Error: {e}")
                     await bot.delete_messages(event.chat_id, dl_msg.id) if 'dl_msg' in locals() else None
                     
-                    # Debug: Check if the downloaded file exists
                     if not os.path.exists(res_file):
                         error_msg = (
                             f"**Error:** Downloaded file not found!\n"
@@ -383,7 +380,6 @@ async def upload_handler(event):
                         await conv.send_message(error_msg)
                         continue
 
-                    # Extract video metadata with MoviePy
                     try:
                         clip = VideoFileClip(res_file)
                         duration = int(clip.duration)
@@ -394,7 +390,6 @@ async def upload_handler(event):
                         await conv.send_message(f"MoviePy error: {mp_err}\nPlease check the file path: `{res_file}`")
                         continue
                     
-                    # If no thumbnail was provided, generate one for this video using FFmpeg
                     if batch_thumb is None:
                         thumb_file = f"{file_name}_thumb.jpg"
                         generated_thumb = generate_thumbnail(res_file, thumb_file)
@@ -402,7 +397,6 @@ async def upload_handler(event):
                     else:
                         current_thumb = batch_thumb
 
-                    # UPLOAD WITH PROGRESS CALLBACK using custom progress bar
                     progress_msg = await conv.send_message("Uploading file... 0%")
                     last_percent = 0
                     last_time = time.time()
@@ -416,18 +410,13 @@ async def upload_handler(event):
                             dt = now - last_time
                             speed = (current - last_bytes) / dt if dt > 0 else 0
                             speed_str = human_readable(speed) + "/s"
-                            # Create a progress bar with 20 segments
                             bar_length = 20
                             filled_length = int(bar_length * current // total)
                             progress_bar = "█" * filled_length + "░" * (bar_length - filled_length)
                             perc_str = f"{percent:.2f}%"
                             cur_str = human_readable(current)
                             tot_str = human_readable(total)
-                            if speed > 0:
-                                eta_seconds = (total - current) / speed
-                                eta = format_eta(eta_seconds)
-                            else:
-                                eta = "Calculating..."
+                            eta = format_eta((total - current) / speed) if speed > 0 else "Calculating..."
                             text = (
                                 f"<b>\n"
                                 f" ╭──⌯════🆄︎ᴘʟᴏᴀᴅɪɴɢ⬆️⬆️═════⌯──╮ \n"
@@ -451,11 +440,9 @@ async def upload_handler(event):
                         uploaded_file = await fast_upload(bot, file_obj, progress_callback=progress_callback)
                     await bot.delete_messages(event.chat_id, progress_msg.id)
 
-                    # Set the uploaded file's name and add video attributes
                     uploaded_file.name = f"{file_name}.mp4"
                     attributes = [DocumentAttributeVideo(duration, w=width, h=height, supports_streaming=True)]
 
-                    # Send the uploaded file with proper metadata and thumbnail
                     await bot.send_file(
                         event.chat_id,
                         file=uploaded_file,
@@ -475,17 +462,12 @@ async def upload_handler(event):
                 await conv.send_message(error_text)
                 continue
 
-        # End of link processing
         await conv.send_message("**Done Boss 😎**")
         await bot.delete_messages(event.chat_id, status_msg.id)
 
-        # Clean up: Remove thumbnail file if provided/generated
         if batch_thumb is not None and os.path.exists(batch_thumb):
             os.remove(batch_thumb)
 
-# =============================================================================
-#                           MAIN ENTRY POINT
-# =============================================================================
 def main():
     print("Bot is running... (Commit a70a8a8)")
     bot.run_until_disconnected()
