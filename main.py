@@ -107,6 +107,18 @@ def generate_thumbnail(video_file, thumbnail_path, time_offset="00:00:01.000"):
         log.error(f"Thumbnail generation failed: {e}")
         return None
 
+def get_browser_headers():
+    """
+    Returns headers that mimic a modern web browser.
+    """
+    return {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+    }
+
 # =============================================================================
 #                           TELEGRAM BOT HANDLERS
 # =============================================================================
@@ -274,14 +286,9 @@ async def upload_handler(event):
             # -------------------------------------------------------------------
             if "visionias" in url:
                 async with aiohttp.ClientSession() as session:
-                    async with session.get(
-                        url,
-                        headers={
-                            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,'
-                                      'image/avif,image/webp,image/apng,*/*;q=0.8',
-                            'User-Agent': 'Mozilla/5.0'
-                        }
-                    ) as resp:
+                    # Mimic browser headers using our helper function
+                    headers = get_browser_headers()
+                    async with session.get(url, headers=headers) as resp:
                         text = await resp.text()
                         m = re.search(r"(https://.*?playlist\.m3u8.*?)\"", text)
                         if m:
