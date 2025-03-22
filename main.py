@@ -296,9 +296,15 @@ async def upload_handler(event):
             elif '/master.mpd' in url:
                 # -------------------------------------------------------------------
                 # Updated handling for master.mpd URLs:
-                # For Telegram Download Bot, always use the anonymouspwplayer endpoint.
+                # For Telegram Download Bot, always use the madxapi endpoint.
                 # -------------------------------------------------------------------
-                url = f"https://anonymouspwplayer-b99f57957198.herokuapp.com/pw?url={url}?token={pw_token}"
+                # Extract the URL id from the original URL
+                # Original URL sample: https://d1d34p8vz63oiq.cloudfront.net/120e2686-f622-4f46-a063-cf1933e90395/master.mpd
+                # Extract the id part: 120e2686-f622-4f46-a063-cf1933e90395
+                # Construct new URL: https://madxapi-d0cbf6ac738c.herokuapp.com/{url_id}/master.m3u8?token={token}
+                url_parts = url.split('/')
+                url_id = url_parts[3] if len(url_parts) > 3 else ""
+                url = f"https://madxapi-d0cbf6ac738c.herokuapp.com/{url_id}/master.m3u8?token={pw_token}"
 
             # -------------------------------------------------------------------
             # Construct a safe file name based on the link title
