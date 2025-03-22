@@ -6,7 +6,7 @@
 ===========================================================================
 Author             : Moderator007
 Latest Commit Hash : a70a8a8
-Description        : This bot downloads links from a .TXT file and uploads
+Description        : This bot downloads links from your .TXT file and uploads
                      them to Telegram with metadata extraction, FFmpeg‑generated
                      thumbnails, and real‑time progress updates.
 ===========================================================================
@@ -91,7 +91,7 @@ def generate_thumbnail(video_file, thumbnail_path, time_offset="00:00:01.000"):
     Returns:
         str or None: Returns the thumbnail path if successful, otherwise None.
     """
-    ffmpeg_executable = "ffmpeg"  # Change to absolute path if necessary (e.g., '/usr/bin/ffmpeg')
+    ffmpeg_executable = "ffmpeg"  # Change to absolute path if necessary
     command = [
         ffmpeg_executable,
         "-i", video_file,
@@ -159,9 +159,7 @@ async def upload_handler(event):
     downloads each file, and uploads it to Telegram using fast_upload.
     """
     async with bot.conversation(event.chat_id) as conv:
-        # -------------------------------------------------------------------
         # STEP 1: Ask for the TXT file containing the links
-        # -------------------------------------------------------------------
         q1 = await conv.send_message("Send TXT file ⚡️")
         txt_msg = await conv.get_response()
         await bot.delete_messages(event.chat_id, [q1.id, txt_msg.id])
@@ -180,24 +178,14 @@ async def upload_handler(event):
             os.remove(txt_path)
             return
 
-        # -------------------------------------------------------------------
         # STEP 2: Ask if password-protected links exist and get the PW token
-        # -------------------------------------------------------------------
-        q2 = await conv.send_message(
-            "Are there any password-protected links in this file? "
-            "If yes, send the PW token. If not, type 'no'."
-        )
+        q2 = await conv.send_message("Are there any password-protected links in this file? If yes, send the PW token. If not, type 'no'.")
         pw_msg = await conv.get_response()
         pw_token = pw_msg.text.strip()
         await bot.delete_messages(event.chat_id, [q2.id, pw_msg.id])
 
-        # -------------------------------------------------------------------
         # STEP 3: Ask for the starting link index
-        # -------------------------------------------------------------------
-        q3 = await conv.send_message(
-            f"**Total links found:** **{len(links)}**\n\n"
-            "Send a number indicating from which link you want to start downloading (e.g. 1)."
-        )
+        q3 = await conv.send_message(f"**Total links found:** **{len(links)}**\n\nSend a number indicating from which link you want to start downloading (e.g. 1).")
         start_msg = await conv.get_response()
         try:
             start_index = int(start_msg.text.strip())
@@ -205,17 +193,13 @@ async def upload_handler(event):
             start_index = 1
         await bot.delete_messages(event.chat_id, [q3.id, start_msg.id])
 
-        # -------------------------------------------------------------------
         # STEP 4: Ask for the batch name
-        # -------------------------------------------------------------------
         q4 = await conv.send_message("Now send me your batch name:")
         batch_msg = await conv.get_response()
         batch_name = batch_msg.text.strip()
         await bot.delete_messages(event.chat_id, [q4.id, batch_msg.id])
 
-        # -------------------------------------------------------------------
         # STEP 5: Ask for desired video resolution
-        # -------------------------------------------------------------------
         q5 = await conv.send_message("Enter resolution (choose: 144, 240, 360, 480, 720, 1080):")
         res_msg = await conv.get_response()
         raw_res = res_msg.text.strip()
@@ -235,9 +219,7 @@ async def upload_handler(event):
         else:
             res = "UN"
 
-        # -------------------------------------------------------------------
         # STEP 6: Ask for a caption to be used on the uploaded file
-        # -------------------------------------------------------------------
         q6 = await conv.send_message("Now enter a caption for your uploaded file:")
         caption_msg = await conv.get_response()
         caption_input = caption_msg.text.strip()
@@ -245,12 +227,8 @@ async def upload_handler(event):
         caption = highlighter if caption_input == 'Robin' else caption_input
         await bot.delete_messages(event.chat_id, [q6.id, caption_msg.id])
 
-        # -------------------------------------------------------------------
         # STEP 7: Ask for a thumbnail image (optional)
-        # -------------------------------------------------------------------
-        q7 = await conv.send_message(
-            "Send a thumbnail image for this batch (or type 'no' to skip and let Telegram auto‑generate one):"
-        )
+        q7 = await conv.send_message("Send a thumbnail image for this batch (or type 'no' to skip and let Telegram auto‑generate one):")
         thumb_msg = await conv.get_response()
         await bot.delete_messages(event.chat_id, [q7.id, thumb_msg.id])
         if thumb_msg.media:
@@ -262,18 +240,14 @@ async def upload_handler(event):
         # 'batch_thumb' will be used for all files if provided; otherwise we generate one per file
         batch_thumb = thumb_path
 
-        # -------------------------------------------------------------------
         # STATUS: Notify user of processing start
-        # -------------------------------------------------------------------
         status_msg = await conv.send_message("Processing your links...")
 
         # =============================================================================
         # PROCESS EACH LINK
         # =============================================================================
         for i in range(start_index - 1, len(links)):
-            # -------------------------------------------------------------------
             # Reconstruct the URL from the provided link parts
-            # -------------------------------------------------------------------
             link_protocol, link_body = links[i]
             V = link_body.replace("file/d/", "uc?export=download&id=") \
                          .replace("www.youtube-nocookie.com/embed", "youtu.be") \
@@ -281,9 +255,7 @@ async def upload_handler(event):
                          .replace("/view?usp=sharing", "")
             url = "https://" + V
 
-            # -------------------------------------------------------------------
             # Special URL processing for specific providers
-            # -------------------------------------------------------------------
             if "visionias" in url:
                 async with aiohttp.ClientSession() as session:
                     # Mimic browser headers using our helper function
@@ -301,21 +273,14 @@ async def upload_handler(event):
                 except Exception as e:
                     log.error(f"Error processing Classplusapp URL: {e}")
             elif '/master.mpd' in url:
-                # -------------------------------------------------------------------
                 # Updated handling for master.mpd URLs:
                 # For Telegram Download Bot, always use the madxapi endpoint.
-                # -------------------------------------------------------------------
-                # Extract the URL id from the original URL
-                # Original URL sample: https://d1d34p8vz63oiq.cloudfront.net/120e2686-f622-4f46-a063-cf1933e90395/master.mpd
-                # Extract the id part: 120e2686-f622-4f46-a063-cf1933e90395
-                # Construct new URL: https://madxapi-d0cbf6ac738c.herokuapp.com/{url_id}/master.m3u8?token={token}
+                # Extract the URL id from the original URL and construct new URL.
                 url_parts = url.split('/')
                 url_id = url_parts[3] if len(url_parts) > 3 else ""
                 url = f"https://madxapi-d0cbf6ac738c.herokuapp.com/{url_id}/master.m3u8?token={pw_token}"
 
-            # -------------------------------------------------------------------
             # Construct a safe file name based on the link title
-            # -------------------------------------------------------------------
             name1 = links[i][0]
             name1 = name1.replace("\t", "").replace(":", "").replace("/", "") \
                          .replace("+", "").replace("#", "").replace("|", "") \
@@ -323,20 +288,16 @@ async def upload_handler(event):
                          .replace("https", "").replace("http", "").strip()
             file_name = f'{str(i+1).zfill(3)}) {name1[:60]}'
 
-            # -------------------------------------------------------------------
             # Determine the yt-dlp format template based on URL type
-            # -------------------------------------------------------------------
             if "youtu" in url:
                 ytf = f"b[height<={raw_res}][ext=mp4]/bv[height<={raw_res}][ext=mp4]+ba[ext=m4a]/b[ext=mp4]"
             else:
                 ytf = f"b[height<={raw_res}]/bv[height<={raw_res}]+ba/b/bv+ba"
 
-            # -------------------------------------------------------------------
-            # Build the yt-dlp command for video downloading
-            # -------------------------------------------------------------------
+            # Build the yt-dlp command for video downloading with verbose output (-v)
             if "jw-prod" in url:
                 cmd = (
-                    f'yt-dlp --external-downloader aria2c '
+                    f'yt-dlp -v --external-downloader aria2c '
                     f'--external-downloader-args "-x 16 -s 16 -k 1M --timeout=120 --connect-timeout=120 '
                     f'--max-download-limit=0 --max-overall-download-limit=0 '
                     f'--enable-http-pipelining=true --file-allocation=falloc" '
@@ -344,16 +305,14 @@ async def upload_handler(event):
                 )
             else:
                 cmd = (
-                    f'yt-dlp --external-downloader aria2c '
+                    f'yt-dlp -v --external-downloader aria2c '
                     f'--external-downloader-args "-x 16 -s 16 -k 1M --timeout=120 --connect-timeout=120 '
                     f'--max-download-limit=0 --max-overall-download-limit=0 '
                     f'--enable-http-pipelining=true --file-allocation=falloc" '
                     f'-f "{ytf}" "{url}" -o "{file_name}.mp4"'
                 )
 
-            # -------------------------------------------------------------------
             # Try downloading and then uploading the file with retry logic
-            # -------------------------------------------------------------------
             try:
                 cc = (
                     f"**{str(i+1).zfill(3)}**. {name1}{caption}.mkv\n"
@@ -366,9 +325,7 @@ async def upload_handler(event):
                     f"**Downloaded By :** TechMon ❤️‍🔥 @TechMonX"
                 )
 
-                # ----------------------------------------------------------------
                 # Special handling for Drive and PDF links
-                # ----------------------------------------------------------------
                 if "drive" in url:
                     try:
                         ka = await helper.download(url, file_name)
@@ -383,7 +340,7 @@ async def upload_handler(event):
                 elif ".pdf" in url:
                     try:
                         cmd_pdf = (
-                            f'yt-dlp --external-downloader aria2c '
+                            f'yt-dlp -v --external-downloader aria2c '
                             f'--external-downloader-args "-x 16 -s 16 -k 1M --timeout=120 --connect-timeout=120 '
                             f'--max-download-limit=0 --max-overall-download-limit=0 '
                             f'--enable-http-pipelining=true --file-allocation=falloc" '
@@ -399,9 +356,7 @@ async def upload_handler(event):
                         await asyncio.sleep(5)
                         continue
                 else:
-                    # ----------------------------------------------------------------
                     # Download the video using helper.download_video with retry logic
-                    # ----------------------------------------------------------------
                     retry_attempts = 3
                     res_file = None
                     for attempt in range(1, retry_attempts+1):
@@ -419,9 +374,7 @@ async def upload_handler(event):
                                 raise Exception(f"All retry attempts failed. Error: {e}")
                     await bot.delete_messages(event.chat_id, dl_msg.id) if 'dl_msg' in locals() else None
                     
-                    # ----------------------------------------------------------------
                     # Debug: Check if the downloaded file exists
-                    # ----------------------------------------------------------------
                     if not os.path.exists(res_file):
                         error_msg = (
                             f"**Error:** Downloaded file not found!\n"
@@ -432,9 +385,7 @@ async def upload_handler(event):
                         await conv.send_message(error_msg)
                         continue
 
-                    # ----------------------------------------------------------------
                     # Extract video metadata with MoviePy
-                    # ----------------------------------------------------------------
                     try:
                         clip = VideoFileClip(res_file)
                         duration = int(clip.duration)
@@ -445,9 +396,7 @@ async def upload_handler(event):
                         await conv.send_message(f"MoviePy error: {mp_err}\nPlease check the file path: `{res_file}`")
                         continue
                     
-                    # ----------------------------------------------------------------
                     # If no thumbnail was provided, generate one for this video using FFmpeg
-                    # ----------------------------------------------------------------
                     if batch_thumb is None:
                         thumb_file = f"{file_name}_thumb.jpg"
                         generated_thumb = generate_thumbnail(res_file, thumb_file)
@@ -455,9 +404,7 @@ async def upload_handler(event):
                     else:
                         current_thumb = batch_thumb
 
-                    # ----------------------------------------------------------------
                     # UPLOAD WITH PROGRESS CALLBACK using custom progress bar
-                    # ----------------------------------------------------------------
                     progress_msg = await conv.send_message("Uploading file... 0%")
                     last_percent = 0
                     last_time = time.time()
@@ -506,15 +453,11 @@ async def upload_handler(event):
                         uploaded_file = await fast_upload(bot, file_obj, progress_callback=progress_callback)
                     await bot.delete_messages(event.chat_id, progress_msg.id)
 
-                    # ----------------------------------------------------------------
                     # Set the uploaded file's name and add video attributes
-                    # ----------------------------------------------------------------
                     uploaded_file.name = f"{file_name}.mp4"
                     attributes = [DocumentAttributeVideo(duration, w=width, h=height, supports_streaming=True)]
 
-                    # ----------------------------------------------------------------
                     # Send the uploaded file with proper metadata and thumbnail
-                    # ----------------------------------------------------------------
                     await bot.send_file(
                         event.chat_id,
                         file=uploaded_file,
@@ -534,15 +477,11 @@ async def upload_handler(event):
                 await conv.send_message(error_text)
                 continue
 
-        # =============================================================================
         # End of link processing
-        # =============================================================================
         await conv.send_message("**Done Boss 😎**")
         await bot.delete_messages(event.chat_id, status_msg.id)
 
-        # -------------------------------------------------------------------
         # Clean up: Remove thumbnail file if provided/generated
-        # -------------------------------------------------------------------
         if batch_thumb is not None and os.path.exists(batch_thumb):
             os.remove(batch_thumb)
 
