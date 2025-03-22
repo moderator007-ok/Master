@@ -403,14 +403,32 @@ async def upload_handler(event):
                     )
                     res_file = await helper.download_video(url, cmd, file_name)
                     await bot.delete_messages(event.chat_id, dl_msg.id)
+                    
+                    # ----------------------------------------------------------------
+                    # Debug: Check if the downloaded file exists
+                    # ----------------------------------------------------------------
+                    if not os.path.exists(res_file):
+                        error_msg = (
+                            f"**Error:** Downloaded file not found!\n"
+                            f"Expected path: `{res_file}`\n"
+                            f"Skipping link: `{url}`"
+                        )
+                        log.error(error_msg)
+                        await conv.send_message(error_msg)
+                        continue
 
                     # ----------------------------------------------------------------
                     # Extract video metadata with MoviePy
                     # ----------------------------------------------------------------
-                    clip = VideoFileClip(res_file)
-                    duration = int(clip.duration)
-                    width, height = clip.size
-                    clip.close()
+                    try:
+                        clip = VideoFileClip(res_file)
+                        duration = int(clip.duration)
+                        width, height = clip.size
+                        clip.close()
+                    except Exception as mp_err:
+                        log.error(f"MoviePy error: {mp_err}")
+                        await conv.send_message(f"MoviePy error: {mp_err}\nPlease check the file path: `{res_file}`")
+                        continue
                     
                     # ----------------------------------------------------------------
                     # If no thumbnail was provided, generate one for this video using FFmpeg
