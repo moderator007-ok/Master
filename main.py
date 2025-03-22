@@ -119,6 +119,9 @@ def get_browser_headers():
         "Connection": "keep-alive",
     }
 
+# Define this flag to choose between aria2c (external) and the native downloader.
+USE_NATIVE_DOWNLOADER = False
+
 # =============================================================================
 #                           TELEGRAM BOT HANDLERS
 # =============================================================================
@@ -290,11 +293,9 @@ async def upload_handler(event):
                 ytf = f"b[height<={raw_res}]/bv[height<={raw_res}]+ba/b/bv+ba"
 
             # Build the yt-dlp command for video downloading.
-            # The command now uses aria2c as the external downloader with the additional flag
-            # --no-check-certificate (bypassing certificate verification for aria2c only),
-            # verbose output (-v), increased socket timeout, and TLS enforcement.
+            # Uses aria2c as external downloader with --no-check-certificate.
             if USE_NATIVE_DOWNLOADER:
-                downloader_cmd = ""  # Use native downloader (no external downloader arguments)
+                downloader_cmd = ""  # Use native downloader
             else:
                 downloader_cmd = (
                     '--external-downloader aria2c '
@@ -312,7 +313,7 @@ async def upload_handler(event):
                     f'-f "{ytf}" "{url}" -o "{file_name}.mp4"'
                 )
 
-            # Try downloading and then uploading the file with retry logic
+            # Try downloading and uploading the file with retry logic
             try:
                 cc = (
                     f"**{str(i+1).zfill(3)}**. {name1}{caption}.mkv\n"
