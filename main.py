@@ -294,10 +294,10 @@ async def upload_handler(event):
             else:
                 ytf = f"b[height<={raw_res}]/bv[height<={raw_res}]+ba/b/bv+ba"
 
-            # Build the yt-dlp command for video downloading with verbose output (-v)
+            # Build the yt-dlp command for video downloading with verbose output and increased socket timeout.
             if "jw-prod" in url:
                 cmd = (
-                    f'yt-dlp -v --external-downloader aria2c '
+                    f'yt-dlp -v --socket-timeout 300 --external-downloader aria2c '
                     f'--external-downloader-args "-x 16 -s 16 -k 1M --timeout=120 --connect-timeout=120 '
                     f'--max-download-limit=0 --max-overall-download-limit=0 '
                     f'--enable-http-pipelining=true --file-allocation=falloc" '
@@ -305,7 +305,7 @@ async def upload_handler(event):
                 )
             else:
                 cmd = (
-                    f'yt-dlp -v --external-downloader aria2c '
+                    f'yt-dlp -v --socket-timeout 300 --external-downloader aria2c '
                     f'--external-downloader-args "-x 16 -s 16 -k 1M --timeout=120 --connect-timeout=120 '
                     f'--max-download-limit=0 --max-overall-download-limit=0 '
                     f'--enable-http-pipelining=true --file-allocation=falloc" '
@@ -340,7 +340,7 @@ async def upload_handler(event):
                 elif ".pdf" in url:
                     try:
                         cmd_pdf = (
-                            f'yt-dlp -v --external-downloader aria2c '
+                            f'yt-dlp -v --socket-timeout 300 --external-downloader aria2c '
                             f'--external-downloader-args "-x 16 -s 16 -k 1M --timeout=120 --connect-timeout=120 '
                             f'--max-download-limit=0 --max-overall-download-limit=0 '
                             f'--enable-http-pipelining=true --file-allocation=falloc" '
