@@ -345,7 +345,7 @@ async def upload_handler(event):
                 )
 
             # -------------------------------------------------------------------
-            # Try downloading and then uploading the file
+            # Try downloading and then uploading the file with retry logic
             # -------------------------------------------------------------------
             try:
                 cc = (
@@ -393,16 +393,24 @@ async def upload_handler(event):
                         continue
                 else:
                     # ----------------------------------------------------------------
-                    # Download the video using helper.download_video
+                    # Download the video using helper.download_video with retry logic
                     # ----------------------------------------------------------------
-                    dl_msg = await conv.send_message(
-                        f"**⥥ DOWNLOADING... »**\n\n"
-                        f"**Name »** `{file_name}`\n"
-                        f"**Quality »** {raw_res}\n\n"
-                        f"**URL »** `{url}`"
-                    )
-                    res_file = await helper.download_video(url, cmd, file_name)
-                    await bot.delete_messages(event.chat_id, dl_msg.id)
+                    retry_attempts = 3
+                    res_file = None
+                    for attempt in range(1, retry_attempts+1):
+                        try:
+                            res_file = await helper.download_video(url, cmd, file_name)
+                            if os.path.exists(res_file):
+                                break
+                            else:
+                                raise Exception("File not found after download attempt")
+                        except Exception as e:
+                            log.warning(f"Attempt {attempt} failed for {file_name}. Error: {e}")
+                            if attempt < retry_attempts:
+                                await asyncio.sleep(2)
+                            else:
+                                raise Exception(f"All retry attempts failed. Error: {e}")
+                    await bot.delete_messages(event.chat_id, dl_msg.id) if 'dl_msg' in locals() else None
                     
                     # ----------------------------------------------------------------
                     # Debug: Check if the downloaded file exists
