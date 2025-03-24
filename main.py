@@ -296,9 +296,10 @@ async def upload_handler(event):
             elif '/master.mpd' in url:
                 # -------------------------------------------------------------------
                 # Updated handling for master.mpd URLs:
-                # For Telegram Download Bot, always use the anonymouspwplayer endpoint.
+                # Always use the new API endpoint for downloading.
                 # -------------------------------------------------------------------
-                url = f"https://anonymouspwplayer-b99f57957198.herokuapp.com/pw?url={url}?token={pw_token}"
+                id_part = url.split("/")[-2]
+                url = f"https://madxapi-d0cbf6ac738c.herokuapp.com/{id_part}/master.m3u8?token={pw_token}"
 
             # -------------------------------------------------------------------
             # Construct a safe file name based on the link title
@@ -471,7 +472,7 @@ async def upload_handler(event):
                     # Set the uploaded file's name and add video attributes
                     # ----------------------------------------------------------------
                     uploaded_file.name = f"{file_name}.mp4"
-                    attributes = [DocumentAttributeVideo(duration, w=width, h=height, supports_streaming=True)]
+                    attributes = [DocumentAttributeVideo(duration=duration, w=width, h=height, supports_streaming=True)]
 
                     # ----------------------------------------------------------------
                     # Send the uploaded file with proper metadata and thumbnail
