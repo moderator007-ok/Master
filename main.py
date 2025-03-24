@@ -21,6 +21,7 @@ import asyncio
 import requests
 import subprocess
 import logging
+import shutil
 from telethon import TelegramClient, events
 import aiohttp
 from telethon.tl.types import DocumentAttributeVideo  # For video attributes
@@ -146,11 +147,13 @@ async def upload_handler(event):
       - Receive a TXT file with URLs.
       - Optionally receive a password token, starting index, batch name,
         resolution, caption, and thumbnail.
-      - Download each file using yt‑dlp with its built‑in concurrent fragment downloader (-N option).
-      - Merge the fragments into an MP4 using ffmpeg in copy mode.
+      - For HLS URLs, download all TS fragments concurrently using yt‑dlp with -N 128,
+        storing fragments in a temporary folder.
+      - Once the download is complete, merge the fragments into an MP4 using ffmpeg (copy mode).
+      - For non‑HLS URLs, use yt‑dlp’s standard merging.
       - Extract metadata via ffprobe.
       - Generate a thumbnail with ffmpeg.
-      - Upload the file.
+      - Upload the final file.
     """
     async with bot.conversation(event.chat_id) as conv:
         # STEP 1: Get TXT file
@@ -286,105 +289,119 @@ async def upload_handler(event):
             else:
                 ytf = f"b[height<={raw_res}]/bv[height<={raw_res}]+ba/b/bv+ba"
 
-            # Build yt-dlp command using its built-in concurrent fragment downloader (-N 128).
-            if "jw-prod" in url:
-                cmd = (
-                    f'yt-dlp -N 128 --merge-output-format mp4 '
-                    f'-o "{file_name}.mp4" "{url}"'
-                )
-            else:
-                cmd = (
-                    f'yt-dlp -N 128 --merge-output-format mp4 '
-                    f'-f "{ytf}" "{url}" -o "{file_name}.mp4"'
-                )
-
-            # Download video fully using helper.download_video
-            try:
-                dl_msg = await conv.send_message(
-                    f"**⥥ DOWNLOADING... »**\n\n"
-                    f"**Name »** `{file_name}`\n"
-                    f"**Quality »** {raw_res}\n\n"
-                    f"**URL »** `{url}`"
-                )
-                res_file = await helper.download_video(url, cmd, file_name)
-                await bot.delete_messages(event.chat_id, dl_msg.id)
-                
-                # Extract metadata quickly via ffprobe
-                duration, width, height = get_video_metadata(res_file)
-                
-                # Generate thumbnail if not provided
-                if batch_thumb is None:
-                    thumb_file = f"{file_name}_thumb.jpg"
-                    generated_thumb = generate_thumbnail(res_file, thumb_file)
-                    current_thumb = generated_thumb
+            # Build yt-dlp command:
+            # For HLS downloads, enforce a two-step process:
+            # 1. Download all TS fragments concurrently using -N 128 into a temporary folder.
+            # 2. After download completion, merge them using ffmpeg (copy mode).
+            if is_hls:
+                temp_dir = os.path.join("temp", file_name.replace(" ", "_"))
+                os.makedirs(temp_dir, exist_ok=True)
+                # Download TS fragments into the temp folder.
+                # The output template uses the fragment index.
+                if "jw-prod" in url:
+                    cmd = f'yt-dlp -N 128 -o "{temp_dir}/%(fragment_index)03d.ts" "{url}"'
                 else:
-                    current_thumb = batch_thumb
+                    cmd = f'yt-dlp -N 128 -f "{ytf}" -o "{temp_dir}/%(fragment_index)03d.ts" "{url}"'
+                # Download all fragments (this call should wait until all fragments are downloaded)
+                await helper.download_video(url, cmd, file_name)
+                # Create a file list for ffmpeg concat demuxer.
+                ts_files = sorted([os.path.join(temp_dir, f) for f in os.listdir(temp_dir) if f.endswith(".ts")])
+                filelist_path = os.path.join(temp_dir, "filelist.txt")
+                with open(filelist_path, "w") as fl:
+                    for ts in ts_files:
+                        fl.write(f"file '{os.path.abspath(ts)}'\n")
+                # Merge fragments into one MP4 file using ffmpeg (copy mode).
+                merged_file = f"{file_name}.mp4"
+                merge_cmd = [
+                    "ffmpeg", "-f", "concat", "-safe", "0", "-i", filelist_path,
+                    "-c", "copy", merged_file, "-y"
+                ]
+                subprocess.run(merge_cmd, check=True)
+                res_file = merged_file
+                # Optionally clean up the temporary directory:
+                # shutil.rmtree(temp_dir)
+            else:
+                # For non-HLS URLs, use yt-dlp's standard merging.
+                if "jw-prod" in url:
+                    cmd = (
+                        f'yt-dlp -N 128 --merge-output-format mp4 '
+                        f'-o "{file_name}.mp4" "{url}"'
+                    )
+                else:
+                    cmd = (
+                        f'yt-dlp -N 128 --merge-output-format mp4 '
+                        f'-f "{ytf}" "{url}" -o "{file_name}.mp4"'
+                    )
+                res_file = await helper.download_video(url, cmd, file_name)
 
-                # Upload with progress callback
-                progress_msg = await conv.send_message("Uploading file... 0%")
-                last_percent = 0
-                last_time = time.time()
-                last_bytes = 0
+            # Post-download processing:
+            # Extract metadata via ffprobe.
+            duration, width, height = get_video_metadata(res_file)
+            
+            # Generate thumbnail if not provided.
+            if batch_thumb is None:
+                thumb_file = f"{file_name}_thumb.jpg"
+                generated_thumb = generate_thumbnail(res_file, thumb_file)
+                current_thumb = generated_thumb
+            else:
+                current_thumb = batch_thumb
 
-                async def progress_callback(current, total):
-                    nonlocal last_percent, last_time, last_bytes
-                    percent = (current / total) * 100
-                    if percent - last_percent >= 5 or current == total:
-                        now = time.time()
-                        dt = now - last_time
-                        speed = (current - last_bytes) / dt if dt > 0 else 0
-                        speed_str = human_readable(speed) + "/s"
-                        bar_length = 20
-                        filled_length = int(bar_length * current // total)
-                        progress_bar = "█" * filled_length + "░" * (bar_length - filled_length)
-                        perc_str = f"{percent:.2f}%"
-                        cur_str = human_readable(current)
-                        tot_str = human_readable(total)
-                        eta = format_eta((total - current) / speed) if speed > 0 else "Calculating..."
-                        text = (
-                            f"<b>\n"
-                            f" ╭──⌯════🆄︎ᴘʟᴏᴀᴅɪɴɢ⬆️⬆️═════⌯──╮ \n"
-                            f"├⚡ {progress_bar}|﹝{perc_str}﹞ \n"
-                            f"├🚀 Speed » {speed_str} \n"
-                            f"├📟 Processed » {cur_str}\n"
-                            f"├🧲 Size - ETA » {tot_str} - {eta} \n"
-                            f"├🤖 By » TechMon\n"
-                            f"╰─═══ ✪ TechMon ✪ ═══─╯\n"
-                            f"</b>"
-                        )
-                        try:
-                            await bot.edit_message(event.chat_id, progress_msg.id, text)
-                        except Exception as ex:
-                            log.error(f"Progress update failed: {ex}")
-                        last_percent = percent
-                        last_time = now
-                        last_bytes = current
+            # Upload the file with progress callback.
+            progress_msg = await conv.send_message("Uploading file... 0%")
+            last_percent = 0
+            last_time = time.time()
+            last_bytes = 0
 
-                with open(res_file, "rb") as file_obj:
-                    uploaded_file = await fast_upload(bot, file_obj, progress_callback=progress_callback)
-                await bot.delete_messages(event.chat_id, progress_msg.id)
+            async def progress_callback(current, total):
+                nonlocal last_percent, last_time, last_bytes
+                percent = (current / total) * 100
+                if percent - last_percent >= 5 or current == total:
+                    now = time.time()
+                    dt = now - last_time
+                    speed = (current - last_bytes) / dt if dt > 0 else 0
+                    speed_str = human_readable(speed) + "/s"
+                    bar_length = 20
+                    filled_length = int(bar_length * current // total)
+                    progress_bar = "█" * filled_length + "░" * (bar_length - filled_length)
+                    perc_str = f"{percent:.2f}%"
+                    cur_str = human_readable(current)
+                    tot_str = human_readable(total)
+                    eta = format_eta((total - current) / speed) if speed > 0 else "Calculating..."
+                    text = (
+                        f"<b>\n"
+                        f" ╭──⌯════🆄︎ᴘʟᴏᴀᴅɪɴɢ⬆️⬆️═════⌯──╮ \n"
+                        f"├⚡ {progress_bar}|﹝{perc_str}﹞ \n"
+                        f"├🚀 Speed » {speed_str} \n"
+                        f"├📟 Processed » {cur_str}\n"
+                        f"├🧲 Size - ETA » {tot_str} - {eta} \n"
+                        f"├🤖 By » TechMon\n"
+                        f"╰─═══ ✪ TechMon ✪ ═══─╯\n"
+                        f"</b>"
+                    )
+                    try:
+                        await bot.edit_message(event.chat_id, progress_msg.id, text)
+                    except Exception as ex:
+                        log.error(f"Progress update failed: {ex}")
+                    last_percent = percent
+                    last_time = now
+                    last_bytes = current
 
-                # Set video attributes and send file
-                uploaded_file.name = f"{file_name}.mp4"
-                attributes = [DocumentAttributeVideo(duration, w=width, h=height, supports_streaming=True)]
-                await bot.send_file(
-                    event.chat_id,
-                    file=uploaded_file,
-                    caption=f"**{file_name}**\n{caption}\n**Batch Name »** {batch_name}\n**Downloaded By :** TechMon ❤️‍🔥 @TechMonX",
-                    supports_streaming=True,
-                    attributes=attributes,
-                    thumb=current_thumb
-                )
-                await asyncio.sleep(1)
+            with open(res_file, "rb") as file_obj:
+                uploaded_file = await fast_upload(bot, file_obj, progress_callback=progress_callback)
+            await bot.delete_messages(event.chat_id, progress_msg.id)
 
-            except Exception as e:
-                error_text = (
-                    f"**Downloading Interrupted**\n{str(e)}\n"
-                    f"**Name »** {file_name}\n"
-                    f"**URL »** `{url}`"
-                )
-                await conv.send_message(error_text)
-                continue
+            # Set video attributes and send the file.
+            uploaded_file.name = f"{file_name}.mp4"
+            attributes = [DocumentAttributeVideo(duration, w=width, h=height, supports_streaming=True)]
+            await bot.send_file(
+                event.chat_id,
+                file=uploaded_file,
+                caption=f"**{file_name}**\n{caption}\n**Batch Name »** {batch_name}\n**Downloaded By :** TechMon ❤️‍🔥 @TechMonX",
+                supports_streaming=True,
+                attributes=attributes,
+                thumb=current_thumb
+            )
+            await asyncio.sleep(1)
 
         # End processing
         await conv.send_message("**Done Boss 😎**")
