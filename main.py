@@ -91,9 +91,10 @@ def generate_thumbnail(video_file, thumbnail_path, time_offset="00:00:01.000"):
     Returns:
         str or None: Returns the thumbnail path if successful, otherwise None.
     """
-    ffmpeg_executable = "ffmpeg"  # Change to absolute path if necessary
+    ffmpeg_executable = "ffmpeg"  # Adjust path if necessary (e.g., '/usr/bin/ffmpeg')
     command = [
         ffmpeg_executable,
+        "-threads", "0",  # Automatically use optimal number of threads
         "-i", video_file,
         "-ss", time_offset,
         "-vframes", "1",
@@ -272,7 +273,7 @@ async def upload_handler(event):
             # -------------------------------------------------------------------
             # Special URL processing for specific providers
             # -------------------------------------------------------------------
-            is_hls = False  # Flag to indicate if the URL should be treated as an HLS manifest
+            is_hls = False  # Flag indicating if URL should be treated as an HLS manifest
             if "visionias" in url:
                 async with aiohttp.ClientSession() as session:
                     async with session.get(
@@ -297,8 +298,7 @@ async def upload_handler(event):
             elif '/master.mpd' in url:
                 # -------------------------------------------------------------------
                 # Updated handling for master.mpd URLs:
-                # For Telegram Download Bot, always use the anonymouspwplayer endpoint.
-                # Also, treat these URLs as HLS manifests.
+                # Use the anonymouspwplayer endpoint and treat as HLS manifest.
                 # -------------------------------------------------------------------
                 url = f"https://anonymouspwplayer-b99f57957198.herokuapp.com/pw?url={url}?token={pw_token}"
                 is_hls = True
@@ -324,13 +324,12 @@ async def upload_handler(event):
             # -------------------------------------------------------------------
             # Build the yt-dlp command for video downloading
             # -------------------------------------------------------------------
-            # If the URL is from an anonymous player (HLS), add a flag to force HLS processing.
+            # Use higher concurrency for aria2c. If the URL is HLS, add --hls-prefer-native.
+            downloader_args = '"-x 32 -s 32 -j 64 -k 1M --timeout=120 --connect-timeout=120 --max-download-limit=0 --max-overall-download-limit=0 --enable-http-pipelining=true --file-allocation=falloc"'
             if "jw-prod" in url:
                 cmd = (
                     f'yt-dlp --external-downloader aria2c '
-                    f'--external-downloader-args "-x 16 -s 16 -k 1M --timeout=120 --connect-timeout=120 '
-                    f'--max-download-limit=0 --max-overall-download-limit=0 '
-                    f'--enable-http-pipelining=true --file-allocation=falloc" '
+                    f'--external-downloader-args {downloader_args} '
                     f'-o "{file_name}.mp4" "{url}"'
                 )
             else:
@@ -338,17 +337,13 @@ async def upload_handler(event):
                     cmd = (
                         f'yt-dlp --hls-prefer-native '
                         f'--external-downloader aria2c '
-                        f'--external-downloader-args "-x 16 -s 16 -k 1M --timeout=120 --connect-timeout=120 '
-                        f'--max-download-limit=0 --max-overall-download-limit=0 '
-                        f'--enable-http-pipelining=true --file-allocation=falloc" '
+                        f'--external-downloader-args {downloader_args} '
                         f'-f "{ytf}" "{url}" -o "{file_name}.mp4"'
                     )
                 else:
                     cmd = (
                         f'yt-dlp --external-downloader aria2c '
-                        f'--external-downloader-args "-x 16 -s 16 -k 1M --timeout=120 --connect-timeout=120 '
-                        f'--max-download-limit=0 --max-overall-download-limit=0 '
-                        f'--enable-http-pipelining=true --file-allocation=falloc" '
+                        f'--external-downloader-args {downloader_args} '
                         f'-f "{ytf}" "{url}" -o "{file_name}.mp4"'
                     )
 
@@ -385,9 +380,7 @@ async def upload_handler(event):
                     try:
                         cmd_pdf = (
                             f'yt-dlp --external-downloader aria2c '
-                            f'--external-downloader-args "-x 16 -s 16 -k 1M --timeout=120 --connect-timeout=120 '
-                            f'--max-download-limit=0 --max-overall-download-limit=0 '
-                            f'--enable-http-pipelining=true --file-allocation=falloc" '
+                            f'--external-downloader-args {downloader_args} '
                             f'-o "{file_name}.pdf" "{url}"'
                         )
                         download_cmd = f"{cmd_pdf} -R 25 --fragment-retries 25"
