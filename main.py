@@ -94,7 +94,7 @@ def generate_thumbnail(video_file, thumbnail_path, time_offset="00:00:01.000"):
     ffmpeg_executable = "ffmpeg"  # Adjust path if necessary (e.g., '/usr/bin/ffmpeg')
     command = [
         ffmpeg_executable,
-        "-threads", "0",  # Automatically use optimal number of threads
+        "-threads", "0",  # Use all available cores
         "-i", video_file,
         "-ss", time_offset,
         "-vframes", "1",
@@ -324,8 +324,9 @@ async def upload_handler(event):
             # -------------------------------------------------------------------
             # Build the yt-dlp command for video downloading
             # -------------------------------------------------------------------
-            # Use higher concurrency for aria2c. If the URL is HLS, add --hls-prefer-native.
-            downloader_args = '"-x 32 -s 32 -j 64 -k 1M --timeout=120 --connect-timeout=120 --max-download-limit=0 --max-overall-download-limit=0 --enable-http-pipelining=true --file-allocation=falloc"'
+            # Use maximum concurrency for aria2c. If the URL is HLS, add --hls-prefer-native.
+            # Note: -x is fixed at 16 (the maximum allowed).
+            downloader_args = '"-x 16 -s 16 -j 64 -k 1M --timeout=120 --connect-timeout=120 --max-download-limit=0 --max-overall-download-limit=0 --enable-http-pipelining=true --file-allocation=falloc"'
             if "jw-prod" in url:
                 cmd = (
                     f'yt-dlp --external-downloader aria2c '
