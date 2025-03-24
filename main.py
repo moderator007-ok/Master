@@ -7,8 +7,9 @@
 Author             : Moderator007
 Latest Commit Hash : a70a8a8
 Description        : This bot downloads links from a .TXT file and uploads
-                     them to Telegram with metadata extraction (using ffprobe),
-                     FFmpeg‑generated thumbnails, and real‑time progress updates.
+                     them to Telegram with metadata extraction (via ffprobe),
+                     FFmpeg‑generated thumbnails (using copy merging, no re‑encode),
+                     and real‑time progress updates.
 ===========================================================================
 """
 
@@ -72,9 +73,9 @@ def format_eta(seconds):
 def generate_thumbnail(video_file, thumbnail_path, time_offset="00:00:01.000"):
     """
     Generate a thumbnail image from a video file using FFmpeg.
-    The downloaded file is fully available locally.
+    This ffmpeg call uses copy mode since the file is fully merged.
     """
-    ffmpeg_executable = "ffmpeg"  # Adjust path if needed
+    ffmpeg_executable = "ffmpeg"  # Adjust path if necessary
     command = [
         ffmpeg_executable,
         "-threads", "0",  # Use all available cores
@@ -94,10 +95,9 @@ def generate_thumbnail(video_file, thumbnail_path, time_offset="00:00:01.000"):
 def get_video_metadata(file_path):
     """
     Quickly extract video metadata (duration, width, height) using ffprobe.
-    This avoids fully loading the file via a Python library.
+    This avoids loading the file via a heavier Python library.
     """
     try:
-        # ffprobe command to extract duration, width, height
         cmd = [
             "ffprobe", "-v", "error",
             "-select_streams", "v:0",
@@ -106,7 +106,6 @@ def get_video_metadata(file_path):
             file_path
         ]
         result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
-        # Expected output: three lines: width, height, duration
         output = result.stdout.strip().splitlines()
         if len(output) >= 3:
             width = int(float(output[0]))
@@ -123,7 +122,7 @@ def get_video_metadata(file_path):
 
 @bot.on(events.NewMessage(pattern=r'^/start'))
 async def start_handler(event):
-    """Handle /start command by sending a welcome message."""
+    """Handle /start command."""
     welcome_message = (
         f"<b>Hello {event.sender.first_name} 👋</b>\n\n"
         "I am a bot that downloads links from your <b>.TXT</b> file and uploads them to Telegram.\n"
@@ -144,16 +143,17 @@ async def stop_handler(event):
 async def upload_handler(event):
     """
     Handle /upload command:
-    - Receive a TXT file with URLs.
-    - Process optional password token, starting index, batch name, resolution,
-      caption, and thumbnail.
-    - Download each file at maximum speed.
-    - Once fully downloaded, quickly extract metadata using ffprobe.
-    - Generate thumbnail (if needed) using FFmpeg.
-    - Upload file to Telegram.
+      - Receive a TXT file with URLs.
+      - Optionally receive a password token, starting index, batch name,
+        resolution, caption, and thumbnail.
+      - Download each file using yt‑dlp with aria2c (100% parallel, full speed).
+      - Use yt‑dlp's merging (via ffmpeg with copy) to create an MP4.
+      - Extract metadata via ffprobe.
+      - Generate a thumbnail with ffmpeg.
+      - Upload the file.
     """
     async with bot.conversation(event.chat_id) as conv:
-        # STEP 1: Get the TXT file
+        # STEP 1: Get TXT file
         q1 = await conv.send_message("Send TXT file ⚡️")
         txt_msg = await conv.get_response()
         await bot.delete_messages(event.chat_id, [q1.id, txt_msg.id])
@@ -171,7 +171,7 @@ async def upload_handler(event):
             os.remove(txt_path)
             return
 
-        # STEP 2: Get password token if any
+        # STEP 2: Get password token (if any)
         q2 = await conv.send_message(
             "Are there any password-protected links in this file? "
             "If yes, send the PW token. If not, type 'no'."
@@ -217,7 +217,7 @@ async def upload_handler(event):
         q6 = await conv.send_message("Now enter a caption for your uploaded file:")
         caption_msg = await conv.get_response()
         caption_input = caption_msg.text.strip()
-        highlighter = "️ ⁪⁬⁮⁮⁮"
+        highlighter = "️ ⁪⁬⁮⁮⁮"  # Custom highlighter if needed
         caption = highlighter if caption_input == 'Robin' else caption_input
         await bot.delete_messages(event.chat_id, [q6.id, caption_msg.id])
 
@@ -227,10 +227,7 @@ async def upload_handler(event):
         )
         thumb_msg = await conv.get_response()
         await bot.delete_messages(event.chat_id, [q7.id, thumb_msg.id])
-        if thumb_msg.media:
-            thumb_path = await bot.download_media(thumb_msg)
-        else:
-            thumb_path = None
+        thumb_path = await bot.download_media(thumb_msg) if thumb_msg.media else None
         batch_thumb = thumb_path
 
         # Notify processing start
@@ -275,7 +272,7 @@ async def upload_handler(event):
                 url = f"https://anonymouspwplayer-b99f57957198.herokuapp.com/pw?url={url}?token={pw_token}"
                 is_hls = True
 
-            # Construct safe file name
+            # Construct a safe file name
             name1 = links[i][0]
             name1 = name1.replace("\t", "").replace(":", "").replace("/", "") \
                          .replace("+", "").replace("#", "").replace("|", "") \
@@ -283,37 +280,32 @@ async def upload_handler(event):
                          .replace("https", "").replace("http", "").strip()
             file_name = f'{str(i+1).zfill(3)}) {name1[:60]}'
 
-            # Determine format template
+            # Determine yt-dlp format template
             if "youtu" in url:
                 ytf = f"b[height<={raw_res}][ext=mp4]/bv[height<={raw_res}][ext=mp4]+ba[ext=m4a]/b[ext=mp4]"
             else:
                 ytf = f"b[height<={raw_res}]/bv[height<={raw_res}]+ba/b/bv+ba"
 
-            # Build yt-dlp command with maximum concurrency.
-            # Note: -x 16 is the maximum allowed.
+            # Build yt-dlp command
+            # Do NOT add --hls-prefer-native so that aria2c downloads all TS segments in parallel.
+            # Also add --merge-output-format mp4 so that ffmpeg merges segments using "-c copy".
             downloader_args = '"-x 16 -s 16 -j 64 -k 1M --timeout=120 --connect-timeout=120 --max-download-limit=0 --max-overall-download-limit=0 --enable-http-pipelining=true --file-allocation=falloc"'
             if "jw-prod" in url:
                 cmd = (
-                    f'yt-dlp --external-downloader aria2c '
+                    f'yt-dlp --merge-output-format mp4 '
+                    f'--external-downloader aria2c '
                     f'--external-downloader-args {downloader_args} '
                     f'-o "{file_name}.mp4" "{url}"'
                 )
             else:
-                if is_hls:
-                    cmd = (
-                        f'yt-dlp --hls-prefer-native '
-                        f'--external-downloader aria2c '
-                        f'--external-downloader-args {downloader_args} '
-                        f'-f "{ytf}" "{url}" -o "{file_name}.mp4"'
-                    )
-                else:
-                    cmd = (
-                        f'yt-dlp --external-downloader aria2c '
-                        f'--external-downloader-args {downloader_args} '
-                        f'-f "{ytf}" "{url}" -o "{file_name}.mp4"'
-                    )
+                cmd = (
+                    f'yt-dlp --merge-output-format mp4 '
+                    f'--external-downloader aria2c '
+                    f'--external-downloader-args {downloader_args} '
+                    f'-f "{ytf}" "{url}" -o "{file_name}.mp4"'
+                )
 
-            # Download the video fully (using helper.download_video)
+            # Download video fully
             try:
                 dl_msg = await conv.send_message(
                     f"**⥥ DOWNLOADING... »**\n\n"
@@ -324,10 +316,10 @@ async def upload_handler(event):
                 res_file = await helper.download_video(url, cmd, file_name)
                 await bot.delete_messages(event.chat_id, dl_msg.id)
                 
-                # Once downloaded, quickly extract metadata using ffprobe
+                # Extract metadata quickly using ffprobe
                 duration, width, height = get_video_metadata(res_file)
                 
-                # Generate thumbnail if not provided
+                # Generate thumbnail if none provided
                 if batch_thumb is None:
                     thumb_file = f"{file_name}_thumb.jpg"
                     generated_thumb = generate_thumbnail(res_file, thumb_file)
@@ -335,7 +327,7 @@ async def upload_handler(event):
                 else:
                     current_thumb = batch_thumb
 
-                # Upload file with progress callback
+                # Upload with progress callback
                 progress_msg = await conv.send_message("Uploading file... 0%")
                 last_percent = 0
                 last_time = time.time()
@@ -379,7 +371,7 @@ async def upload_handler(event):
                     uploaded_file = await fast_upload(bot, file_obj, progress_callback=progress_callback)
                 await bot.delete_messages(event.chat_id, progress_msg.id)
 
-                # Set file attributes and send the file
+                # Set attributes and send file
                 uploaded_file.name = f"{file_name}.mp4"
                 attributes = [DocumentAttributeVideo(duration, w=width, h=height, supports_streaming=True)]
                 await bot.send_file(
@@ -401,11 +393,11 @@ async def upload_handler(event):
                 await conv.send_message(error_text)
                 continue
 
-        # End of processing links
+        # End processing
         await conv.send_message("**Done Boss 😎**")
         await bot.delete_messages(event.chat_id, status_msg.id)
 
-        # Clean up thumbnail if needed
+        # Clean up thumbnail if provided/generated
         if batch_thumb is not None and os.path.exists(batch_thumb):
             os.remove(batch_thumb)
 
