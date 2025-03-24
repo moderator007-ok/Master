@@ -146,8 +146,8 @@ async def upload_handler(event):
       - Receive a TXT file with URLs.
       - Optionally receive a password token, starting index, batch name,
         resolution, caption, and thumbnail.
-      - Download each file using yt‑dlp with the built‑in concurrent fragment downloader (‑N option).
-      - Use yt‑dlp's merging (via ffmpeg in copy mode) to create an MP4.
+      - Download each file using yt‑dlp with its built‑in concurrent fragment downloader (-N option).
+      - Merge the fragments into an MP4 using ffmpeg in copy mode.
       - Extract metadata via ffprobe.
       - Generate a thumbnail with ffmpeg.
       - Upload the file.
@@ -286,8 +286,7 @@ async def upload_handler(event):
             else:
                 ytf = f"b[height<={raw_res}]/bv[height<={raw_res}]+ba/b/bv+ba"
 
-            # Build yt-dlp command using the built-in concurrent fragment downloader
-            # The -N 128 option downloads up to 128 fragments concurrently.
+            # Build yt-dlp command using its built-in concurrent fragment downloader (-N 128).
             if "jw-prod" in url:
                 cmd = (
                     f'yt-dlp -N 128 --merge-output-format mp4 '
