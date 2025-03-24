@@ -217,7 +217,7 @@ async def upload_handler(event):
         q6 = await conv.send_message("Now enter a caption for your uploaded file:")
         caption_msg = await conv.get_response()
         caption_input = caption_msg.text.strip()
-        highlighter = "️ ⁪⁬⁮⁮⁮"  # Custom highlighter if needed
+        highlighter = "️ ⁪⁬⁮⁮⁮"
         caption = highlighter if caption_input == 'Robin' else caption_input
         await bot.delete_messages(event.chat_id, [q6.id, caption_msg.id])
 
@@ -286,10 +286,10 @@ async def upload_handler(event):
             else:
                 ytf = f"b[height<={raw_res}]/bv[height<={raw_res}]+ba/b/bv+ba"
 
-            # Build yt-dlp command
-            # Do NOT add --hls-prefer-native so that aria2c downloads all TS segments in parallel.
-            # Also add --merge-output-format mp4 so that ffmpeg merges segments using "-c copy".
-            downloader_args = '"-x 16 -s 16 -j 64 -k 1M --timeout=120 --connect-timeout=120 --max-download-limit=0 --max-overall-download-limit=0 --enable-http-pipelining=true --file-allocation=falloc"'
+            # Build yt-dlp command.
+            # We are not using --hls-prefer-native so that aria2c handles the download,
+            # and we add --merge-output-format mp4 so ffmpeg merges segments with copy mode.
+            downloader_args = '"-x 16 -s 16 -j 128 -k 1M --timeout=120 --connect-timeout=120 --max-download-limit=0 --max-overall-download-limit=0 --enable-http-pipelining=true --file-allocation=falloc"'
             if "jw-prod" in url:
                 cmd = (
                     f'yt-dlp --merge-output-format mp4 '
@@ -305,7 +305,7 @@ async def upload_handler(event):
                     f'-f "{ytf}" "{url}" -o "{file_name}.mp4"'
                 )
 
-            # Download video fully
+            # Download video fully using helper.download_video
             try:
                 dl_msg = await conv.send_message(
                     f"**⥥ DOWNLOADING... »**\n\n"
@@ -316,10 +316,10 @@ async def upload_handler(event):
                 res_file = await helper.download_video(url, cmd, file_name)
                 await bot.delete_messages(event.chat_id, dl_msg.id)
                 
-                # Extract metadata quickly using ffprobe
+                # Extract metadata quickly via ffprobe
                 duration, width, height = get_video_metadata(res_file)
                 
-                # Generate thumbnail if none provided
+                # Generate thumbnail if not provided
                 if batch_thumb is None:
                     thumb_file = f"{file_name}_thumb.jpg"
                     generated_thumb = generate_thumbnail(res_file, thumb_file)
@@ -371,7 +371,7 @@ async def upload_handler(event):
                     uploaded_file = await fast_upload(bot, file_obj, progress_callback=progress_callback)
                 await bot.delete_messages(event.chat_id, progress_msg.id)
 
-                # Set attributes and send file
+                # Set video attributes and send file
                 uploaded_file.name = f"{file_name}.mp4"
                 attributes = [DocumentAttributeVideo(duration, w=width, h=height, supports_streaming=True)]
                 await bot.send_file(
@@ -393,7 +393,7 @@ async def upload_handler(event):
                 await conv.send_message(error_text)
                 continue
 
-        # End processing
+        # End of processing links
         await conv.send_message("**Done Boss 😎**")
         await bot.delete_messages(event.chat_id, status_msg.id)
 
