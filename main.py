@@ -91,7 +91,7 @@ def generate_thumbnail(video_file, thumbnail_path, time_offset="00:00:01.000"):
     Returns:
         str or None: Returns the thumbnail path if successful, otherwise None.
     """
-    ffmpeg_executable = "ffmpeg"  # Change to absolute path if necessary (e.g., '/usr/bin/ffmpeg')
+    ffmpeg_executable = "ffmpeg"  # Change to absolute path if necessary
     command = [
         ffmpeg_executable,
         "-i", video_file,
@@ -272,6 +272,7 @@ async def upload_handler(event):
             # -------------------------------------------------------------------
             # Special URL processing for specific providers
             # -------------------------------------------------------------------
+            is_hls = False  # Flag to indicate if the URL should be treated as an HLS manifest
             if "visionias" in url:
                 async with aiohttp.ClientSession() as session:
                     async with session.get(
@@ -297,8 +298,10 @@ async def upload_handler(event):
                 # -------------------------------------------------------------------
                 # Updated handling for master.mpd URLs:
                 # For Telegram Download Bot, always use the anonymouspwplayer endpoint.
+                # Also, treat these URLs as HLS manifests.
                 # -------------------------------------------------------------------
                 url = f"https://anonymouspwplayer-b99f57957198.herokuapp.com/pw?url={url}?token={pw_token}"
+                is_hls = True
 
             # -------------------------------------------------------------------
             # Construct a safe file name based on the link title
@@ -321,6 +324,7 @@ async def upload_handler(event):
             # -------------------------------------------------------------------
             # Build the yt-dlp command for video downloading
             # -------------------------------------------------------------------
+            # If the URL is from an anonymous player (HLS), add a flag to force HLS processing.
             if "jw-prod" in url:
                 cmd = (
                     f'yt-dlp --external-downloader aria2c '
@@ -330,13 +334,23 @@ async def upload_handler(event):
                     f'-o "{file_name}.mp4" "{url}"'
                 )
             else:
-                cmd = (
-                    f'yt-dlp --external-downloader aria2c '
-                    f'--external-downloader-args "-x 16 -s 16 -k 1M --timeout=120 --connect-timeout=120 '
-                    f'--max-download-limit=0 --max-overall-download-limit=0 '
-                    f'--enable-http-pipelining=true --file-allocation=falloc" '
-                    f'-f "{ytf}" "{url}" -o "{file_name}.mp4"'
-                )
+                if is_hls:
+                    cmd = (
+                        f'yt-dlp --hls-prefer-native '
+                        f'--external-downloader aria2c '
+                        f'--external-downloader-args "-x 16 -s 16 -k 1M --timeout=120 --connect-timeout=120 '
+                        f'--max-download-limit=0 --max-overall-download-limit=0 '
+                        f'--enable-http-pipelining=true --file-allocation=falloc" '
+                        f'-f "{ytf}" "{url}" -o "{file_name}.mp4"'
+                    )
+                else:
+                    cmd = (
+                        f'yt-dlp --external-downloader aria2c '
+                        f'--external-downloader-args "-x 16 -s 16 -k 1M --timeout=120 --connect-timeout=120 '
+                        f'--max-download-limit=0 --max-overall-download-limit=0 '
+                        f'--enable-http-pipelining=true --file-allocation=falloc" '
+                        f'-f "{ytf}" "{url}" -o "{file_name}.mp4"'
+                    )
 
             # -------------------------------------------------------------------
             # Try downloading and then uploading the file
