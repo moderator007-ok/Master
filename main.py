@@ -73,7 +73,7 @@ def format_eta(seconds):
 def generate_thumbnail(video_file, thumbnail_path, time_offset="00:00:01.000"):
     """
     Generate a thumbnail image from a video file using FFmpeg.
-    This ffmpeg call uses copy mode since the file is fully merged.
+    This call uses copy mode (no re‑encoding) as the file is already merged.
     """
     ffmpeg_executable = "ffmpeg"  # Adjust path if necessary
     command = [
@@ -95,7 +95,7 @@ def generate_thumbnail(video_file, thumbnail_path, time_offset="00:00:01.000"):
 def get_video_metadata(file_path):
     """
     Quickly extract video metadata (duration, width, height) using ffprobe.
-    This avoids loading the file via a heavier Python library.
+    This avoids using heavier Python libraries like MoviePy.
     """
     try:
         cmd = [
@@ -146,8 +146,8 @@ async def upload_handler(event):
       - Receive a TXT file with URLs.
       - Optionally receive a password token, starting index, batch name,
         resolution, caption, and thumbnail.
-      - Download each file using yt‑dlp with aria2c (100% parallel, full speed).
-      - Use yt‑dlp's merging (via ffmpeg with copy) to create an MP4.
+      - Download each file using yt‑dlp with the built‑in concurrent fragment downloader (‑N option).
+      - Use yt‑dlp's merging (via ffmpeg in copy mode) to create an MP4.
       - Extract metadata via ffprobe.
       - Generate a thumbnail with ffmpeg.
       - Upload the file.
@@ -286,22 +286,16 @@ async def upload_handler(event):
             else:
                 ytf = f"b[height<={raw_res}]/bv[height<={raw_res}]+ba/b/bv+ba"
 
-            # Build yt-dlp command.
-            # We are not using --hls-prefer-native so that aria2c handles the download,
-            # and we add --merge-output-format mp4 so ffmpeg merges segments with copy mode.
-            downloader_args = '"-x 16 -s 16 -j 128 -k 1M --timeout=120 --connect-timeout=120 --max-download-limit=0 --max-overall-download-limit=0 --enable-http-pipelining=true --file-allocation=falloc"'
+            # Build yt-dlp command using the built-in concurrent fragment downloader
+            # The -N 128 option downloads up to 128 fragments concurrently.
             if "jw-prod" in url:
                 cmd = (
-                    f'yt-dlp --merge-output-format mp4 '
-                    f'--external-downloader aria2c '
-                    f'--external-downloader-args {downloader_args} '
+                    f'yt-dlp -N 128 --merge-output-format mp4 '
                     f'-o "{file_name}.mp4" "{url}"'
                 )
             else:
                 cmd = (
-                    f'yt-dlp --merge-output-format mp4 '
-                    f'--external-downloader aria2c '
-                    f'--external-downloader-args {downloader_args} '
+                    f'yt-dlp -N 128 --merge-output-format mp4 '
                     f'-f "{ytf}" "{url}" -o "{file_name}.mp4"'
                 )
 
@@ -393,7 +387,7 @@ async def upload_handler(event):
                 await conv.send_message(error_text)
                 continue
 
-        # End of processing links
+        # End processing
         await conv.send_message("**Done Boss 😎**")
         await bot.delete_messages(event.chat_id, status_msg.id)
 
