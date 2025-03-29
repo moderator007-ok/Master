@@ -1,7 +1,10 @@
 FROM python:3.10.8-slim-buster
 
-# Update the keyring and package lists
+# Update sources to use HTTPS and install apt-transport-https
 RUN apt-get update -y --fix-missing \
+    && apt-get install -y --no-install-recommends apt-transport-https \
+    && sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list \
+    && apt-get update -y --fix-missing \
     && apt-get install -y --no-install-recommends debian-archive-keyring \
     && apt-get update -y --fix-missing \
     && apt-get upgrade -y \
